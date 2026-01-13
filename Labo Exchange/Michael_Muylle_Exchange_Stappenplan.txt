@@ -1,0 +1,790 @@
+Maak de VM's aan
+
+	  Naam			RAM		HD		OS							Netwerk
+	- Mail-PC-105	8192MB	64GB	Windows server 2019 CORE	ExchangeLab_Network
+	- DC-PC-105		2048MB	64GB	Windows server 2019			ExchangeLab_Network
+	- Router-PC-105	1024MB	64GB	Windows server 2019			ExchangeLab_Network
+																Physical Network
+	- CL01-PC-105	2048MB	64GB	Windows 10					ExchangeLab_Network
+	- CL02-PC-105	2048MB	64GB	Windows 10					ExchangeLab_Network
+
+----------------------------------------------------------------
+Post-Install Tasks
+
+	-Tijd en datum instellen
+	-Naam veranderen
+	-Netwerk configuratie
+		Naam			Ip address		subnetmask	DG			DNS
+		DC-PC-105		192.168.105.1		255.255.255.0	192.168.105.254		127.0.0.1
+		Mail-PC-105		192.168.105.2		255.255.255.0	192.168.105.254		192.168.105.1
+		Router-PC-105  	192.168.105.254 	255.255.255.0	-					-
+						192.168.130.205		255.255.255.0	192.168.130.254		-
+						(Schakel Firewalls uit!)
+		CL01-PC-105		192.168.105.3		255.255.255.0	192.168.105.254		192.168.105.1
+		CL02-PC-105		192.168.105.4		255.255.255.0	192.168.105.254		192.168.105.1
+----------------------------------------------------------------
+Rollen installeren en uitvoeren
+
+	 Naam				Role
+	-Router-PC-105 		Remote Access - Routing
+	-DC-PC-105			ADDS en DNS
+	
+	-Routing: 	-NAT-configuratie van ExchangeLab naar Physical
+					-Port Forwarding naar Mail-PC-105 via properties van Physical
+						Internet Mail Access Protocol Version 4 (IMAP4)
+						Internet Mail Server (SMTP)
+						Secure Web Server (HTTPS)
+						Web Server (HTTP)
+	-ADDS:		-Aanmaken nieuw (forest) domain DOLA.local
+					-DRSM: Azerty01
+	-DNS:		-Forwarder instellen via properties van DC-PC-105
+					-192.168.130.1
+-----------------------------------------------------------------
+Domain join doen
+
+-Domain join op Mail-PC-105, CL01-PC-105, CL02-PC-105
+-----------------------------------------------------------------
+Installatie exchange
+
+	-Voorbereiden DC-PC-105 op exchange
+		-Install .NET Framework 4.8
+		-koppel Exchange server 2019 iso
+			Install-WindowsFeature RSAT-ADDS-Tools
+			D:
+			.\Setup.exe /PrepareAD /OrganizationName:DOLA /IacceptExchangeServerLicenseTerms_DiagnosticDataOFF
+	
+	-Prerequisites installeren op Mail-PC-105
+		-koppel Exchange server 2019 iso
+			Install-WindowsFeature Web-WebServer,Web-Common-Http,Web-Default-Doc,Web-Dir-Browsing,Web-Http-Errors,Web-Static-Content,Web-Http-Redirect,Web-Health,Web-Http-Logging,Web-Log-Libraries,Web-Request-Monitor,Web-Http-Tracing,Web-Performance,Web-Stat-Compression,Web-Dyn-Compression,Web-Security,Web-Filtering,Web-Basic-Auth,Web-Client-Auth,Web-Digest-Auth,Web-Windows-Auth,Web-App-Dev,Web-Net-Ext45,Web-Asp-Net45,Web-ISAPI-Ext,Web-ISAPI-Filter,Web-Mgmt-Tools,Web-Mgmt-Compat,Web-Metabase,Web-WMI,Web-Mgmt-Service,NET-Framework-45-ASPNET,NET-WCF-HTTP-Activation45,NET-WCF-MSMQ-Activation45,NET-WCF-Pipe-Activation45,NET-WCF-TCP-Activation45,Server-Media-Foundation,MSMQ-Services,MSMQ-Server,RSAT-Feature-Tools,RSAT-Clustering,RSAT-Clustering-PowerShell,RSAT-Clustering-CmdInterface,RPC-over-HTTP-Proxy,WAS-Process-Model,WAS-Config-APIs
+				-reboot
+		-Kopieer volgende bestanden naar Mail-PC-105 vanaf DC-PC-105 en voer uit
+			(-Enable-NetFirewallRule -DisplayGroup "File and Printer Sharing" \\Mail-PC-105\C$)
+			-Berchem PC -> Software -> Other -> Exchange server
+				cd "C:\Prerequisites"
+				.\VSU_4_vcredist_x64.exe
+				.\vcredist_x64.exe 
+				.\rewrite_amd64_en-us.msi
+			-D:\UCMARedist\Setup.exe
+	
+	-Installatie Exchange Server 2019
+		-Install .NET Framework 4.8
+			.\ndp48-web.exe /q /norestart
+			restart-computer
+		-koppel Exchange server 2019 iso
+			Install-WindowsFeature RSAT-ADDS-Tools
+			D:
+			.\setup.exe /IAcceptExchangeServerLicenseTerms_DiagnosticDataOFF /m:install /r:MB,MT /OrganizationName:"DOLA"
+		-reboot
+------------------------------------------------------------------
+Storage Toevoegen en Raid aanmaken
+
+	-Voeg in totaal 5 VHD toe aan Mail-PC-105 van elk 30GB
+		-3 voor RAID 5 MBD-Storage E:
+		-2 voor RAID 1 TL-storage F:
+		
+	-Open Server Manager op DC-PC-105 en voeg Mail-PC-105 toe
+		-Laat de verbinding toe op MAIL-PC-105
+		winrm quickconfig
+		Enable-PSRemoting -Force
+		netsh advfirewall firewall set rule group="Remote Administration" new enable=yes
+		netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=yes
+			-File and storage services -> Disks
+				-Breng disks online en initialiseer
+
+		-Maak RAID5 en RAID1 volume aan
+			#Nieuwe storage pool aanmaken
+			$StorageSubsystem = Get-StorageSubsystem | Where-Object {$_.FriendlyName -notlike "*Clustering*"}
+			$PhysicalDisks = Get-PhysicalDisk -CanPool $True
+			New-StoragePool -FriendlyName "CompanyPool" -StorageSubsystemFriendlyName $StorageSubsystem.FriendlyName -PhysicalDisks $PhysicalDisks
+
+			#Virtual disk aanmaken RAID5
+			$Pool = Get-StoragePool -FriendlyName "CompanyPool"
+			New-VirtualDisk -StoragePoolFriendlyName "CompanyPool" `
+   			 -FriendlyName "RAID5Disk" `
+   			 -ResiliencySettingName Parity `
+   			 -NumberOfColumns 3 `
+   			 -PhysicalDisks (Get-PhysicalDisk -StoragePool $Pool | Select-Object -First 3) `
+   			 -UseMaximumSize
+			
+			
+			# Selecteer de schijven die NU NOG GEEN Virtuele Schijf hebben
+			$Raid1Disks = Get-PhysicalDisk -StoragePool $Pool | Where-Object { -not $_.VirtualDisk }
+			# Maak de Virtuele Schijf aan (RAID 1 - Mirror)
+			New-VirtualDisk -StoragePoolFriendlyName "CompanyPool" `
+    			 -FriendlyName "RAID1Disk" `
+   			 -ResiliencySettingName Mirror `
+   			 -PhysicalDisks $Raid1Disks `
+   			 -UseMaximumSize
+			 
+			#Volumes aanmaken
+			Get-VirtualDisk -FriendlyName "RAID5Disk" |
+   			Get-Disk |
+    		New-Volume -FileSystem NTFS -FriendlyName "MDB-Storage" -DriveLetter E
+
+			Get-VirtualDisk -FriendlyName "RAID1Disk" |
+    		Get-Disk |
+   			New-Volume -FileSystem NTFS -FriendlyName "TL-Storage" -DriveLetter F
+
+			
+------------------------------------------------------------------
+Database hernoemen en verplaatsen
+
+	-Mailboxen bekijken: Get-MailboxDatabase
+	-Mailbox loskoppelen: Dismount-Database -Identity "Mailbox Database ?"
+	-Mailbox hernoemen: Set-MailboxDatabase -Identity "Mailbox Database ?" -Name "DOLA MBDB"
+	-Mailbox koppelen: Mount-Database -Identity "DOLA MBDB"
+	-Controle: Get-MailboxDatabase -Status | ft Name,Server,Mounted
+	
+	-Verplaatsen Mailbox database en log path:
+		Move-DatabasePath -Identity "DOLA MBDB" -EdbFilePath "E:\DOLA-MBDB\DOLAMBDB.edb" –LogFolderPath “F:\Logs\DOLA-MBDB\”
+		-uitvoeren voor elke mailbox
+------------------------------------------------------------------
+Exchange certificate aanmaken
+
+
+# Define the certificate name and the server
+$certFriendlyName = "Ex2019-Cert"
+$issuerName = "Mail-PC-105"
+
+# Define the domain names
+$domains = @(
+   "mail.DOLA.be",   # Outlook Web App (Internet)
+   "mail.DOLA.local",   # Outlook Web App (Intranet)
+   "autodiscover.DOLA.be",   # Autodiscover (Internet)
+   "Mail-PC-105.DOLA.local",   # Autodiscover (Intranet)
+   "Mail-PC-105",   # POP and IMAP
+   "DOLA.local"   # Domain
+)
+
+# Create the self-signed certificate
+$cert = New-ExchangeCertificate `
+   -FriendlyName $certFriendlyName `
+   -SubjectName "CN=$issuerName" `
+   -DomainName $domains `
+   -PrivateKeyExportable $true
+
+# Enable the certificate for the required services
+Enable-ExchangeCertificate -Thumbprint $cert.Thumbprint -Services IIS,SMTP,IMAP,POP -Force
+------------------------------------------------------------------
+Accepted Domains instellen en EAC gebruiksklaar maken
+	
+	-Nieuwe accepted domain instellen 
+	
+		New-AcceptedDomain -Name "DOLA.be" -DomainName "DOLA.be" -DomainType Authoritative
+	
+	-Nieuwe Virtual directories instellen
+		# OWA
+		Set-OwaVirtualDirectory -Identity "Mail-PC-105\owa (Default Web Site)" `
+    			-ExternalUrl "https://mail.DOLA.be/owa" `
+    			-InternalUrl "https://mail.DOLA.local/owa"
+
+		# ECP (Exchange Control Panel)
+		Set-EcpVirtualDirectory -Identity "Mail-PC-105\ecp (Default Web Site)" `
+				-ExternalUrl "https://mail.DOLA.be/ecp" `
+				-InternalUrl "https://mail.DOLA.local/ecp"
+		
+		-Iisreset
+		
+------------------------------------------------------------------
+DNS-records toevoegen
+
+	-DNS op DC-PC-105
+		-New Forward Lookup Zone DOLA.be
+			-A-record
+				-Mail-PC-105	192.168.105.2
+				-mail			192.168.105.2
+				blanco			192.168.105.1
+			-MX-record
+				-Browse 
+				DC-PC-105 -> Forward Lookup Zone -> DOLA.be -> mail 
+		
+		-DOLA.local  records aanpassen
+			-A-record
+				-mail			192.168.105.2
+			-MX-record
+				-Browse
+				DC-PC-105 -> Forward Lookup Zone -> DOLA.local -> mail
+		
+		New Reverse Lookup Zone
+			-Network id: 192.168.105
+------------------------------------------------------------------
+Recipient Mailbox Policy aanmaken
+
+	-Open EAC op CL01-PC-105
+		-mail flow -> Email address Policies
+			-Naam: DOLA Dual Address Policy
+				-Primary 
+					-Accepted Domain: DOLA.be
+					-Format: John.Smith@contoso.com
+					-Make this format the reply email address = Aanmaken
+				-Secondary
+					-Accepted Domain: DOLA.local
+					-Custom Address Type
+						-smtp
+						-%g@DOLA.local
+--------------------------------------------------------------------
+Recipients aanmaken mailboxes
+
+	!Maak eerst de OU structuur aan in ADUC op DC-PC-105
+	-DOLA.local
+		-OU DOLA
+			-OU GROUPS
+			-OU IT TEAM
+			-OU MACHINES
+				-OU CLIENTS
+				-OU SERVERS
+			-OU USERS
+				-OU ADMINISTRATION
+				-OU ACCOUNTANCY
+				-OU MANAGEMENT
+				-OU TECHNICAL
+				-OU LOGISTICS
+			-OU CONTACTS
+			-OU ROOMS
+				
+				
+	-Voer volgend script uit:
+# =================================================================
+# Script voor het aanmaken van alle 16 gebruikers en hun Mailboxen.
+# =================================================================
+
+# 1. Definieer Globale Variabelen
+$DatabaseName = "DOLA MBDB"
+$InternalDomain = "dola.local"
+$DomainDN = "DC=dola,DC=local"
+# Het basispad naar de USERS OU
+$BaseOUPath = "OU=USERS,OU=DOLA,$DomainDN"
+
+# Wachtwoord instelling. VERVANG 'Azerty01' indien nodig.
+$Password = ConvertTo-SecureString -String 'Azerty01' -AsPlainText -Force
+
+# 2. Definieer de complete lijst met 16 gebruikers per afdeling
+# DE ALIAS WORDT NU GEÏNTERPRETEERD ALS DE VOORNAAM (FirstName)
+$Users = @(
+    # --- Management (2 Gebruikers) ---
+    @{FirstName="Alice"; LastName="Vandamme"; Dept="Management"},
+    @{FirstName="Bob"; LastName="Janssens"; Dept="Management"},
+    
+    # --- Administration (3 Gebruikers) ---
+    @{FirstName="Carla"; LastName="Deneve"; Dept="Administration"},
+    @{FirstName="David"; LastName="Vermeulen"; Dept="Administration"},
+    @{FirstName="Eva"; LastName="Willems"; Dept="Administration"},
+    
+    # --- Accountancy (1 Gebruiker) ---
+    @{FirstName="Frank"; LastName="De Clercq"; Dept="Accountancy"},
+    
+    # --- Technical (8 Gebruikers) ---
+    @{FirstName="Gerry"; LastName="Techno"; Dept="Technical"},
+    @{FirstName="Hans"; LastName="Wannes"; Dept="Technical"},
+    @{FirstName="Irene"; LastName="Server"; Dept="Technical"},
+    @{FirstName="Jeroen"; LastName="Netwerk"; Dept="Technical"},
+    @{FirstName="Karin"; LastName="DevOps"; Dept="Technical"},
+    @{FirstName="Lucas"; LastName="Security"; Dept="Technical"},
+    @{FirstName="Myriam"; LastName="Cloud"; Dept="Technical"},
+    @{FirstName="Niels"; LastName="Helmans"; Dept="Technical"},
+    
+    # --- Logistics (2 Gebruikers) ---
+    @{FirstName="Oscar"; LastName="Goederen"; Dept="Logistics"},
+    @{FirstName="Petra"; LastName="Verzending"; Dept="Logistics"}
+)
+
+# 3. Loop door de lijst en maak elke mailbox aan
+Write-Host "--- Starten met het aanmaken van 16 Mailboxen in $DatabaseName ---" -ForegroundColor Cyan
+foreach ($User in $Users) {
+    $FullName = "$($User.FirstName) $($User.LastName)"
+    # NIEUW: De alias is nu de voornaam
+    $Alias = $User.FirstName 
+    # De UPN (inlognaam) is nu [Voornaam]@dola.local
+    $UPN = "$($Alias)@$InternalDomain"
+    
+    # DEFINIEERT HET GENESTE OU PAD
+    $OUPath = "OU=$($User.Dept),$BaseOUPath"
+    
+    Write-Host "Aanmaken mailbox voor: $FullName in $($User.Dept) OU. Alias/Inlognaam: $Alias"
+    
+    try {
+        # Maakt de AD-gebruiker + Mailbox aan
+        New-Mailbox -Name $FullName `
+                    -Alias $Alias `
+                    -UserPrincipalName $UPN `
+                    -Password $Password `
+                    -OrganizationalUnit $OUPath `
+                    -Database $DatabaseName `
+                    -DisplayName $FullName `
+                    -FirstName $User.FirstName `
+                    -LastName $User.LastName
+        
+        Write-Host "--> Succesvol aangemaakt." -ForegroundColor Green
+
+    } catch {
+        Write-Host "!!! Fout bij aanmaken van mailbox voor $FullName." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+    }
+}
+Write-Host "`n--- Alle 16 gebruikers en mailboxen zijn aangemaakt met voornaam als alias. ---" -ForegroundColor Yellow
+
+-----------------------------------------------------------------------
+Distribution Groups aanmaken en leden toevoegen
+
+
+	-Voer volgend script uit:
+	
+# =================================================================
+# SCRIPT 2: DISTRIBUTION GROUPS AANMAKEN EN LEDEN TOEVOEGEN 
+# =================================================================
+
+# 1. Definieer Globale Variabelen
+$ExternalDomain = "dola.be"
+$DomainDN = "DC=dola,DC=local"
+$BaseOUPath = "OU=USERS,OU=DOLA,$DomainDN"
+
+
+# 2. Definieer de afdelingen en hun leden (op basis van de Voornaam Alias)
+$Departments = @{
+    "Management" = @("Alice", "Bob");
+    "Administration" = @("Carla", "David", "Eva");
+    "Accountancy" = @("Frank");
+    "Technical" = @("Gerry", "Hans", "Irene", "Jeroen", "Karin", "Lucas", "Myriam", "Niels");
+    "Logistics" = @("Oscar", "Petra");
+}
+
+Write-Host "Starten met het aanmaken van Distribution Groups .." -ForegroundColor Cyan
+
+foreach ($DeptName in $Departments.Keys) {
+    
+    $Members = $Departments[$DeptName]
+    $GroupName = $DeptName 
+    $GroupAlias = $DeptName
+    $GroupEmail = "$($GroupAlias)@$ExternalDomain"
+    $OUPath = "OU=$DeptName,$BaseOUPath"
+    
+    Write-Host "`n--- Groep '$GroupName' aanmaken ---" -ForegroundColor Yellow
+
+    # A. Maak de Distribution Group aan (Parameter verwijderd)
+    try {
+        New-DistributionGroup -Name $GroupName `
+                              -Alias $GroupAlias `
+                              -OrganizationalUnit $OUPath `
+                              -PrimarySmtpAddress $GroupEmail `
+                              -SamAccountName $GroupAlias 
+        
+        Write-Host "  -> Groep aangemaakt: $GroupEmail" -ForegroundColor Green
+
+    } catch {
+        Write-Host "  !!! Fout bij aanmaken van groep $GroupName. Dit kan duiden op een foutief OU-pad." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        continue 
+    }
+
+    # B. Voeg de leden toe
+    Write-Host "  -> Leden toevoegen..."
+    foreach ($MemberAlias in $Members) {
+        # De -Member parameter gebruikt de Alias/Voornaam van de gebruiker
+        try {
+            Add-DistributionGroupMember -Identity $GroupName -Member $MemberAlias -Confirm:$false
+            Write-Host "    -> Lid toegevoegd: $MemberAlias" -ForegroundColor DarkGreen
+        } catch {
+             Write-Host "    !!! Lid $MemberAlias niet toegevoegd. Fout: $_.Exception.Message" -ForegroundColor Red
+        }
+    }
+}
+Write-Host "`n--- Alle 5 Distribution Groups zijn succesvol aangemaakt en leden toegevoegd. ---" -ForegroundColor Cyan
+
+
+----------------------------------------------------------------------------
+Configuratie Message Size Limits en Mailbox Storage Quotas
+
+	Message size Limits:
+	-EAC via CL01-PC-105
+		- Recipients -> Mailboxes
+
+		-Probleem! Enkel de mailbox van Administrator is zichtbaar -> Update de GAL
+		Update-GlobalAddressList -Identity "Default Global Address List"
+
+			-Selecteer gebruiker(s) -> Edit
+				-Mailbox Features
+					-Message Size restrictions -> View details
+						-Maximum Send: 15360KB
+						-Maximum receive: 15360KB
+	
+	Storage Quotas
+	-EAC via CL01-PC-105
+		-Recipients -> Mailboxes
+			-Selecteer gebruikers -> Edit
+				-Mailbox Usage
+					-Customize the settings for this mailbox
+						-Issue Warning at 3,8 GB
+						-Prohibit Send at 3,9 GB
+						-Prohibit send and receive at 4 GB
+----------------------------------------------------------------------------
+Aanmaken Archive database en configuratie archive
+
+	Archive database
+	-EAC via CL01-PC-105
+		-Server -> Databases
+			-New Database
+				Mailbox Database: Archive MBDB
+				Server: Mail-PC-105
+				Database File Path: E:\Archive-MBDB\ArchiveMBDB.edb
+				Log folder path: F:\Logs\Archive-MBDB
+	
+	Configuratie Archive
+	-EAC via CL01-PC-105
+		-Recipients -> Mailboxes
+			-dubbelklik mailbox
+				-Mailbox features -> Archiving -> Enable (blauwe link)
+					-Create In-Private archive - > Browse naar database "Archive MBDB"
+
+
+----------------------------------------------------------------------------
+Mail Contacts aanmaken
+
+# =================================================================
+# SCRIPT 3: MAIL CONTACTS AANMAKEN
+# Dit script maakt twee externe Mail Contacts aan, die zichtbaar zijn 
+# in de Global Address List (GAL) voor alle gebruikers.
+# =================================================================
+
+# 1. Definieer Globale Variabelen
+$DomainDN = "DC=dola,DC=local"
+# We plaatsen de contacts in een aparte OU voor Externe Partners, 
+# onder de DOLA OU, zodat ze gescheiden zijn van interne USERS.
+$ContactOUPath = "OU=Contacts,OU=DOLA,$DomainDN" 
+
+Write-Host "--- Starten met het aanmaken van 2 Mail Contacts ---" -ForegroundColor Cyan
+
+# --- Contact 1: Janneman Peeters (Externe Boekhouder) ---
+try {
+    Write-Host "Aanmaken Mail Contact: Janneman Peeters"
+    New-MailContact -Name "Janneman Peeters" `
+                    -Alias "JPeeters" `
+                    -ExternalEmailAddress "janneman.peeters@boekhouder-extern.be" `
+                    -OrganizationalUnit $ContactOUPath `
+                    -DisplayName "Janneman Peeters (Externe Boekhouder)"
+    
+    Write-Host "-> Janneman Peeters succesvol aangemaakt." -ForegroundColor Green
+} catch {
+    Write-Host "!!! Fout bij aanmaken van Janneman Peeters." -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+}
+
+# --- Contact 2: Sarah Dubois (Marketing Partner) ---
+try {
+    Write-Host "Aanmaken Mail Contact: Sarah Dubois"
+    New-MailContact -Name "Sarah Dubois" `
+                    -Alias "SDubois" `
+                    -ExternalEmailAddress "sarah.dubois@marketing-creatief.com" `
+                    -OrganizationalUnit $ContactOUPath `
+                    -DisplayName "Sarah Dubois (Marketing Partner)"
+
+    Write-Host "-> Sarah Dubois succesvol aangemaakt." -ForegroundColor Green
+} catch {
+    Write-Host "!!! Fout bij aanmaken van Sarah Dubois." -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+}
+
+Write-Host "`n--- Alle 2 Mail Contacts zijn aangemaakt. ---" -ForegroundColor Yellow
+
+----------------------------------------------------------------------------
+Mail delegation
+
+	-EAC via CL01-PC-105
+		-Recipients -> Mailboxes -> Alice Vandamme -> Edit
+			-Mailbox delegation
+				-Send On Behalf -> +
+					-Carla Deneve
+					-David Vermeulen
+					-Eva Willems
+		-Herhaal voor Bob Janssens
+----------------------------------------------------------------------------
+Resource mailboxes
+
+# =================================================================
+# SCRIPT 4: ROOM MAILBOXES AANMAKEN EN CONFIGUREREN
+# Dit script maakt 3 zaalmailboxen aan, stelt ze in op automatische 
+# acceptatie, en wijst de Administration medewerkers aan als beheerders.
+# =================================================================
+
+# 1. Definieer Globale Variabelen
+$DatabaseName = "DOLA MBDB" # Mailbox Database voor de Rooms
+$DomainDN = "DC=dola,DC=local"
+$RoomOUPath = "OU=Rooms,OU=DOLA,$DomainDN" 
+
+# De Administration medewerkers (Aliassen: Voornaam) die de zalen beheren
+$AdminDelegates = @("Carla", "David", "Eva") 
+
+$Rooms = @("Milano", "Galactica", "Millennium Falcon")
+
+Write-Host "--- Starten met het aanmaken van 3 Room Mailboxes ---" -ForegroundColor Cyan
+
+foreach ($RoomName in $Rooms) {
+    
+    # Bepaal een alias (Gebruik de volledige naam als Alias, tenzij te lang)
+    if ($RoomName -eq "Millennium Falcon") {
+        $Alias = "Falcon"
+    } else {
+        $Alias = $RoomName
+    }
+
+    Write-Host "`nAanmaken Room Mailbox: $RoomName met Alias $Alias"
+    
+    # A. Maak de Room Mailbox aan
+    try {
+        New-Mailbox -Room `
+                    -Name $RoomName `
+                    -Alias $Alias `
+                    -DisplayName "Vergaderzaal $RoomName" `
+                    -OrganizationalUnit $RoomOUPath `
+                    -Database $DatabaseName
+        
+        Write-Host "  -> Mailbox succesvol aangemaakt. Nu configuratie..." -ForegroundColor Green
+
+    } catch {
+        Write-Host "  !!! Fout bij aanmaken van Room Mailbox $RoomName. Controleer de OU-pad." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        continue 
+    }
+    
+    # B. Configureer Kalenderverwerking: Automatische acceptatie en beheerders
+    try {
+        # AutomateProcessing AutoAccept: Zorgt ervoor dat de zaal automatisch meetings accepteert.
+        # ResourceDelegates: Stelt de Administration medewerkers in staat om boekingen te beheren/wijzigen.
+        Set-CalendarProcessing -Identity $Alias `
+                               -AutomateProcessing AutoAccept `
+                               -ResourceDelegates $AdminDelegates 
+        
+        Write-Host "  -> Configuratie voltooid. Automatisch boeken is ingeschakeld." -ForegroundColor Green
+
+    } catch {
+        Write-Host "  !!! Fout bij instellen van Calendar Processing voor $Alias." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+    }
+}
+Write-Host "`n--- Alle 3 Room Mailboxes zijn succesvol aangemaakt en geconfigureerd. ---" -ForegroundColor Yellow
+	
+-----------------------------------------------------------------------------
+Public Folders aanmaken en configureren
+
+	Nieuwe Database
+	-EAC via CL01-PC-105
+		-Servers -> Databases
+			-New Database
+				-Mailbox Database: PublicFolder MBDB
+				-Server: Mail-PC-105
+				-Database File Path: E:\PF-MBDB\PF-MBDB.edb
+				-Log Folder Path: F:\Logs\PF-MBDB\
+				
+	Nieuwe Mailbox
+	-EAC via CL01-PC-105
+		-Public Folders -> Public Folder Mailboxes
+			-New Public Folder Mailbox
+				-Name: PF-DOLA
+				-Mailbox Database: PublicFolder MBDB
+				
+	Public Folders maken
+	-EAC via CL01-PC-105
+		-Public folders -> public folders
+			-3 New Public Folder
+				-Naam: Info
+				-Naam: Support
+				-Naam: Buy
+	
+	Mail-enabled
+	-EAC via CL01-PC-105
+		-Public folders -> public folders
+			-Selecteer een folder (niet dubbel)
+				-Mail settings -> Enable (blauwe link)
+					-Herhaal voor elke folder
+	Permissions
+	-EAC via CL01-PC-105
+		-Public folders -> public folders
+			-Selecteer een folder (niet dubbel)
+				-Folder permissions -> Manage (blauwe link)
+	
+		-SUPPORT
+			-Alle users van Technical hebben Editor-rechten
+			-Alle users van Management hebben Reviewer-rechten
+			-Administrator is owner
+		-BUY
+			-Alle users van Accountancy hebben Editor-rechten
+			-Alle users van Logistics en Management hebben Reviewer-rechten
+			-Administrator is owner
+		-INFO
+			-Alle medewerkers van Administration hebben Editor-rechten
+			-Alle medewerkers van Management hebben Reviewer-rechten
+			-Administrator is owner
+			
+	Mail delegation
+	-EAC via CL01-PC-105
+		-Public folders -> public folders
+			-Selecteer Info
+				-Delivery Options
+					-Send As
+						-Voeg de medewerkers van administration toe
+								-Carla Deneve
+								-David Vermeulen
+								-Eva Willems
+								
+----------------------------------------------------------------------------
+Connectors aanmaken en configureren
+	
+	Send Connector
+		-EAC via CL01-PC-105
+			-Mail flow -> Send Connectors
+				-Create a Send Connector
+					-Name: Internet send connector
+					-Type: Internet
+				-Address space -> +
+					-FQDN:*
+				-source server: Mail-PC-105
+				
+	Receive Connector
+		-EAC via CL01-PC-105
+			-Mail flow -> Receive connector
+				-Edit Default Mail-PC-105
+					-Security -> Anonymous = Aan
+-----------------------------------------------------------------------------
+Antispam installeren en configureren
+
+	antispam installeren
+		-EAC via CL01-PC-105
+			-Maak een nieuwe mailbox "spamquarantaine"
+		-LaunchEMS op Mail-PC-105
+			cd "C:\Program Files\Microsoft\ExchangeServer\V15\Scripts"
+			.\Install-AntiSpamAgents.ps1
+			Niet in EMS: Restart-Service MSExchangeTransport
+	
+	Antispam configureren (al het verkeer van domein trainer.com is geblokkeerd)
+		-LaunchEMS op Mail-PC-105
+			# Content filtering inschakelen op basis van SCL
+			Set-ContentFilterConfig -Enabled $true
+			Set-ContentFilterConfig -SCLDeleteEnabled $true -SCLDeleteThreshold 9 -SCLRejectEnabled $true -SCLRejectThreshold 8
+			# Sender Filtering inschakelen en trainer.com blokkeren
+			Set-SenderFilterConfig -Enabled $true
+			Set-SenderFilterConfig -BlockedDomainsAndSubdomains "trainer.com"
+			
+----------------------------------------------------------------------------
+Transport Rules configureren
+
+	-EAC via CL01-PC-105
+		- Mail flow -> Rules -> Create new rule
+			-Naam: Spam woorden
+			-Apply this rule if: The subject or body includes any of these words
+				-viagra
+				-porno
+				-sex
+			-Do the following:
+				-Redirect the message to...
+				-Select member -> spamquarantaine
+				
+----------------------------------------------------------------------------
+Postmaster aanmaken en configureren
+	
+	Aanmaken
+	-EAC via CL01-PC-105
+		-Recipients -> Mailboxes
+			- New Mail User
+				-Alias: Postmaster
+					-New User
+						-first name: /
+						-last name: Postmaster
+						-display name: Postmaster
+						-OU: browse naar DOLA.local\USERS
+						-user logon name: Postmaster
+						-Password: Azerty01
+						-More settings:
+							-Mailbox database: DOLA MBDB
+							
+	Inschakelen
+	-LaunchEMS op Mail-PC-105
+		Set-TransportConfig -ExternalPostmasterAddress "Postmaster@dola.be"
+		
+-----------------------------------------------------------------------------------
+Block lists
+		
+	-LaunchEMS op Mail-PC-105
+		Add-IPBlockListProvider -Name "Spamhaus ZEN" -LookupDomain "zen.spamhaus.org" -RejectionResponse "Uw IP is geblokkeerd door de Spamhaus ZEN RBL."
+		Add-IPBlockListProvider -Name "Spamcop" -LookupDomain "bl.spamcop.net" -RejectionResponse "Uw IP is geblokkeerd door de Spamcop RBL."
+		
+-----------------------------------------------------------------------------------
+Offline Address Book
+
+	Departementen definiëren
+	-Open ADUC op DC-PC-105
+		-Controleer of alle gebruikers het correcte Department hebben bij Properties -> organization
+	
+	Address lists
+	-EAC via CL01-PC-105
+		-Organization -> Address Lists
+			-New Address List
+				-Name: Management
+				-address list path : \
+			-Specify types of recipients ... : Users with Exchange mailboxes
+			-Create rule: Add a rule
+				-Department
+					-Management
+			
+		-Herhaal voor Administration, Accountancy, Technical en Logistics
+		-Update
+		
+	OAB maken, instellen als default en update	
+	-LaunchEMS op Mail-PC-105
+			New-OfflineAddressBook -Name "Company OAB" -AddressLists "Management", "Administration", "Accountancy", "Technical", "Logistics"
+			Set-OfflineAddressBook -Identity "Company OAB" -IsDefault $true			
+			Update-OfflineAddressBook -Identity "Company OAB"
+			
+			
+	Virtual directories  URL's aanmaken
+	Set-OabVirtualDirectory -Identity "Mail-PC-105\OAB (Default Web Site)" `
+   	-ExternalUrl "https://mail.DOLA.be/OAB" `
+   	-InternalUrl "https://mail.DOLA.local/OAB"
+	Iisreset
+	Update-OfflineAddressBook -Identity "Company OAB"
+
+------------------------------------------------------------------------------------
+GPO
+
+	-Voeg Edge beheersjablonen toe aan Central Store op DC-PC-105
+		\\DOLA.local\SYSVOL\DOLA.local\Policies\PolicyDefinitions (maak aan indien nodig)
+			-kopieer admx en adml en-US bestanden voor Edge (en de default sjablonen van C:\Windows\PolicyDefinitions)
+	
+	-Maak de nieuwe GPO
+		-Group policy management console
+			-Nieuwe GPO gekoppeld aan ou Users
+				-Navigeer naar: User Configuration → Policies → Administrative Templates → Microsoft Edge → Startup, homepage and new tab page
+					-Configure the new tab URL
+						-Dubbelklik en Enabled
+							-New Tab Page URL: https://mail.dola.local/owa
+					-Set the new tab page as the home page
+						-Enabled
+	-Afdwingen
+		-gpupdate /force op de clients
+		
+-----------------------------------------------------------------------------------
+DNS-registratie
+
+	-Nieuwe forward lookup zone: DOLA.be
+		-A records: 	mail 		192.168.130.205
+						blanco		192.168.130.205
+						Mail-PC-105	192.168.130.205
+		-MX record: verwijs naar "mail"
+
+-----------------------------------------------------------------------------------
+Handtekening
+
+	-Downloaden Server Core installer van CodeTwo (https://www.codetwo.com/email-signatures-on-prem/thanks/server-core)
+		-Plaats de MSI op de MAIL-PC-105
+			-Installatie in CMD: EmailSignaturesOnPremSetupEN.msi /quiet ACTION="INSTALL" EXCHANGE_VERSION="2019" CORE="1"
+
+			-LaunchEMS op MAIL-PC-105: Set-Location "C:\Program Files\CodeTwo\CodeTwo Email Signatures On-prem"
+			.\InstallCodeTwoTransportAgent.ps1
+		-Plaats de MSI op DC-PC-105
+			-Voer uit en installeer de Administration Panel
+				-Open Administration Panel 
+					-List of Rules -> Add Rule for Outgoing mail
+						-Action: Insert Signature
+					-List of Rules -> Add Rule for internal mail
+						-Action: Insert Signature
+	
+-----------------------------------------------------------------------------------	
+
