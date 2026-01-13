@@ -1,0 +1,263 @@
+Netwerk Settings
+
+Netwerkkaart 1: Parent
+Deze kaart verbindt de router met het 172.16.1.0 /24 netwerk.
+
+IP-adres: 172.16.1.254
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: (leeg laten)
+
+Voorkeurs-DNS-server: 172.16.1.1
+
+Netwerkkaart 2: Child
+Deze kaart verbindt de router met het 192.168.20.0 /24 netwerk.
+
+IP-adres: 192.168.20.254
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: (leeg laten)
+
+Voorkeurs-DNS-server: 172.16.1.1
+
+Netwerkkaart 3: Tree
+Deze kaart verbindt de router met het 172.16.3.0 /24 netwerk.
+
+IP-adres: 172.16.3.254
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: (leeg laten)
+
+Voorkeurs-DNS-server: 172.16.1.1
+
+Netwerkkaart 4: Client
+Deze kaart verbindt de router met het 192.168.40.0 /24 netwerk.
+
+IP-adres: 192.168.40.254
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: (leeg laten)
+
+Voorkeurs-DNS-server: 172.16.1.1
+
+
+PA-SRV-DC (Parent)
+IP-adres: 172.16.1.1
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: 172.16.1.254 
+
+Voorkeurs-DNS-server: 127.0.0.1 
+
+CH-SRV-DC (Child)
+IP-adres: 192.168.20.1
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: 192.168.20.254
+
+Voorkeurs-DNS-server: 127.0.0.1
+
+TR-SRV-DC (Tree)
+IP-adres: 172.16.3.1
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: 172.16.3.254
+
+Voorkeurs-DNS-server: 127.0.0.1
+
+HO-CL (Client)
+IP-adres: 192.168.40.11
+
+Subnetmasker: 255.255.255.0
+
+Default Gateway: 192.168.40.254
+
+Voorkeurs-DNS-server: 172.16.1.1 
+
+
+-------------------------------------------------------------------
+
+Stappenplan:
+
+
+
+Fase 1: De Basis Infrastructuur 
+Hier leggen we het fundament in Hyper-V.
+
+Stap 1: Virtuele Netwerken (Switches) aanmaken
+Open Hyper-V Manager en maak vier virtuele switches aan via de "Virtual Switch Manager".
+
+Kies "External" niet, maar "Private" voor alle vier. Zo blijven je VM's in een afgesloten labo-omgeving.
+
+Maak de volgende vier switches aan:
+
+Parent
+
+Child
+
+Tree
+
+Client
+
+Stap 2: Virtuele Machines aanmaken en verbinden
+Maak de vijf virtuele machines aan zoals beschreven, met de opgegeven CPU en RAM. Let goed op de netwerkverbinding:
+
+PA-SRV-DC: Verbind met de Parent switch.
+
+CH-SRV-DC: Verbind met de Child switch.
+
+TR-SRV-DC: Verbind met de Tree switch.
+
+HO-CL: Verbind met de Client switch.
+
+RTR-HO-XXX: Deze is speciaal. Geef deze machine vier netwerkkaarten. Verbind elke kaart met een andere switch (Parent, Child, Tree, Client).
+
+Installeer de besturingssystemen (Windows Server 2019 en Windows 10).
+
+Fase 2: Netwerkconfiguratie 
+Nu zorgen we dat alle machines elkaar kunnen bereiken.
+
+Stap 3: De Router (RTR-HO-XXX) configureren
+
+Start de router-VM. Hernoem de vier netwerkkaarten in Windows naar Parent, Child, Tree en Client zodat je weet welke welke is.
+
+Stel de statische IP-adressen in zoals we eerder besproken hebben (elke kaart krijgt het .254 adres van zijn netwerk, zonder gateway, met 172.16.1.1 als DNS).
+
+Installeer de "Routing and Remote Access" rol en configureer deze voor "LAN routing".
+
+Stap 4: De Servers en Client configureren
+Stel op de andere vier machines de statische IP-adressen in zoals we eerder hebben uitgewerkt. Dit is een cruciale stap! De Default Gateway moet altijd het adres van de router zijn in dat specifieke netwerk (.254).
+
+Stap 5: Connectiviteit Testen
+Ping vanaf de client HO-CL naar de IP-adressen van de servers (172.16.1.1, 192.168.20.1, 172.16.3.1). Als dit werkt, is je netwerkbasis solide. Denk aan de firewall die pings kan blokkeren!
+
+Fase 3: Active Directory Installatie 
+Nu de machines kunnen communiceren, bouwen we de domeinen.
+
+Stap 6: De Parent Domain Controller (PA-SRV-DC) installeren
+
+Stel het lokale administrator wachtwoord in op Azerty01.
+
+Installeer de "Active Directory Domain Services" (AD DS) rol.
+
+Promoveer de server tot een domain controller.
+
+Kies "Add a new forest".
+
+Geef als domeinnaam op: ITcorp.lab.
+
+Voltooi de wizard. De server zal herstarten.
+
+Stap 7: De Child Domain Controller (CH-SRV-DC) installeren
+
+Stel het lokale administrator wachtwoord in op Azerty02.
+
+Installeer de AD DS-rol.
+
+Promoveer de server.
+
+Kies "Add a new domain to an existing forest".
+
+Selecteer als type "Child Domain".
+
+Selecteer het parent domain ITcorp.lab en geef als naam voor het child domain student op. De volledige naam wordt dan student.ITcorp.lab.
+
+Voltooi de wizard.
+
+Stap 8: De Tree Domain Controller (TR-SRV-DC) installeren
+
+Stel het lokale administrator wachtwoord in op Azerty03.
+
+Installeer de AD DS-rol.
+
+Promoveer de server.
+
+Kies "Add a new domain to an existing forest".
+
+Selecteer als type "Tree Domain".
+
+Geef als nieuwe domeinnaam op: training.lab.
+
+Voltooi de wizard.
+
+Fase 4: Active Directory Inrichten & Beveiligen 
+Nu de domeinen bestaan, vullen we ze en passen we beleid toe.
+
+Stap 9: OU-structuur en Gebruikers aanmaken
+
+Ga op PA-SRV-DC naar "Active Directory Users and Computers".
+
+Maak een hoofd-OU genaamd Parent. Daarin maak je de 5 afdelings-OU's (Management, Finance, etc.) en in elke afdeling 2 gebruikers.
+
+Ga op CH-SRV-DC naar AD Users and Computers. Maak een hoofd-OU Child en daarin de OU's voor Marketing en Sales, elk met 2 gebruikers.
+
+Doe hetzelfde op TR-SRV-DC voor de Tree OU en de afdelingen Development, Research en Production.
+
+Stap 10: Wachtwoordbeleid configureren
+Je hebt twee verschillende wachtwoordbeleidsregels nodig.
+
+Voor ITcorp.lab (en Child):
+
+Ga op PA-SRV-DC naar "Group Policy Management".
+
+Bewerk de "Default Domain Policy".
+
+Navigeer naar Computer Configuration -> Policies -> Windows Settings -> Security Settings -> Account Policies -> Password Policy.
+
+Stel hier de eisen in (8 karakters, complex, 120 dagen).
+
+Stel onder Account Lockout Policy de vergrendeling in (5 pogingen, 15 minuten).
+
+Voor training.lab:
+Je kan maar één Default Domain Policy hebben. Voor een afwijkend beleid in de training.lab domein gebruik je een Fine-Grained Password Policy (FGPP).
+
+Ga op TR-SRV-DC naar het "Active Directory Administrative Center".
+
+Navigeer naar je domein, open de System container en ga naar Password Settings Container.
+
+Maak hier een Nieuw wachtwoordbeleid (New -> Password Settings).
+
+Stel hier de strengere eisen in (9 karakters, 180 dagen, 3 pogingen, 30 minuten).
+
+Wijs dit beleid toe aan een groep waar je de gebruikers van het training.lab domein in stopt.
+
+Fase 5: Client en Werkstationbeheer 
+De laatste loodjes: de client machine en het uitrollen van instellingen.
+
+Stap 11: De Client (HO-CL) configureren
+
+Zorg dat de DNS-server op HO-CL correct is ingesteld (172.16.1.1).
+
+Voeg de computer toe aan het domein ITcorp.lab. Ga hiervoor naar Systeemeigenschappen -> Computer Name -> Change.
+
+Herstart de machine en log in met een domein-administrator account.
+
+Om gebruikers te beheren vanaf de client, installeer je de Remote Server Administration Tools (RSAT). Ga in Windows 10 naar Settings -> Apps -> Optional features -> Add a feature en zoek naar RSAT. Installeer de "Active Directory Domain Services and Lightweight Directory Services Tools".
+
+Stap 12: Extra Group Policies instellen
+Ga terug naar de "Group Policy Management" op PA-SRV-DC.
+
+Lokale administrator hernoemen:
+
+Maak een nieuwe GPO aan, noem hem bijvoorbeeld "Workstation Settings" en link hem aan het ITcorp.lab domein.
+
+Bewerk de GPO en ga naar Computer Configuration -> Policies -> Windows Settings -> Security Settings -> Local Policies -> Security Options.
+
+Zoek de policy "Accounts: Rename administrator account" en verander deze naar local-admin.
+
+Bureaubladachtergrond instellen:
+
+Gebruik dezelfde GPO.
+
+Ga naar User Configuration -> Policies -> Administrative Templates -> Desktop -> Desktop.
+
+Activeer de policy "Desktop Wallpaper". Geef het pad op naar een afbeeldingsbestand (bijv. een .jpg-bestand dat op een gedeelde netwerklocatie staat waar iedereen bij kan).
+
+Voer gpupdate /force uit op de client of herstart hem om te zien of de policies worden toegepast.
