@@ -1,6 +1,6 @@
 michael@M365B951530.onmicrosoft.com
 
-SimplyAzerty01
+
 
 admin.microsoft.com (=portal.office.com van vroeger)
 
@@ -35,17 +35,17 @@ New-MgUser @user
 Weergavenaam: IT.Support_105
 Gebruikersnaam: IT.Support_105@M365B951530.onmicrosoft.com
 Wachtwoord: C)973439998788uc
-Nieuw wachtwoord: SimplyAzerty01
+Nieuw wachtwoord: *redacted*01
 
 
 Weergavenaam: ICE_105 Admin
 Gebruikersnaam: ICE.Admin_105@M365B951530.onmicrosoft.com
-Wachtwoord: SimplyAzerty01
+Wachtwoord: *redacted*01
 
 
 Weergavenaam: Michael.Muylle
 Gebruikersnaam: Michael.Muylle@M365B951530.onmicrosoft.com
-Wachtwoord: SimplyAzerty01
+Wachtwoord: *redacted*01
 
 User principal name
 harry.potter_105@M365B951530.onmicrosoft.com
@@ -201,5 +201,6 @@ $roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter "displayNa
 
 Use the New-MgRoleManagementDirectoryRoleAssignment command to assign the role.
 $roleAssignment = New-MgRoleManagementDirectoryRoleAssignment -DirectoryScopeId '/' -RoleDefinitionId $roleDefinition.Id -PrincipalId $group.Id
+
 
 
