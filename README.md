@@ -1,2 +1,2 @@
 # documentation
-Various projects
+Various things I worked on.
