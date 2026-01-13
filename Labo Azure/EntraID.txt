@@ -1,0 +1,205 @@
+michael@M365B951530.onmicrosoft.com
+
+SimplyAzerty01
+
+admin.microsoft.com (=portal.office.com van vroeger)
+
+Weergavenaam: Jan_105 Janssens
+Gebruikersnaam: jan_105.janssens@M365B951530.onmicrosoft.com
+Wachtwoord: D#340361621067om
+Nieuw wachtwoord: D$615422810913ux
+
+
+Nieuwe user via PS:
+
+Installeer de Microsoft Graph PowerShell-module:
+Install-Module Microsoft.Graph -Scope CurrentUser
+
+Maak verbinding:
+Connect-MgGraph -Scopes "User.ReadWrite.All", "Directory.ReadWrite.All"
+
+Individuele gebruiker aanmaken:
+$user = @{
+    AccountEnabled = $true
+    DisplayName = "Jan_105 Jansen"
+    MailNickname = "jan_105jansen"
+    UserPrincipalName = "jan_105jansen@M365B951530.onmicrosoft.com"
+    PasswordProfile = @{
+        Password = "Azerty01"
+        ForceChangePasswordNextSignIn = $true
+    }
+}
+New-MgUser @user
+
+
+Weergavenaam: IT.Support_105
+Gebruikersnaam: IT.Support_105@M365B951530.onmicrosoft.com
+Wachtwoord: C)973439998788uc
+Nieuw wachtwoord: SimplyAzerty01
+
+
+Weergavenaam: ICE_105 Admin
+Gebruikersnaam: ICE.Admin_105@M365B951530.onmicrosoft.com
+Wachtwoord: SimplyAzerty01
+
+
+Weergavenaam: Michael.Muylle
+Gebruikersnaam: Michael.Muylle@M365B951530.onmicrosoft.com
+Wachtwoord: SimplyAzerty01
+
+User principal name
+harry.potter_105@M365B951530.onmicrosoft.com
+Weergavenaam
+Harry Potter 105
+Bijnaam van e-mail
+harry.potter_105
+Wachtwoord
+Vodo991166
+Guva2687
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+You must begin by installing Microsoft Graph PowerShell, importing the Microsoft.Graph.Identity.DirectoryManagement module, and connecting to MgGraph with the proper permissions. The following example provides the Read/Write permissions needed to add a new user.
+
+Install-Module Microsoft.Graph -Scope CurrentUser
+Import-Module Microsoft.Graph.Identity.DirectoryManagement
+Connect-MgGraph -Scopes 'User.ReadWrite.All'
+
+
+create a user account in Microsoft 365. When creating a new user account with the Microsoft Graph PowerShell module, you must specify, at a minimum, the required properties for the user, which includes the user password.
+
+$PasswordProfile = @{ Password = 'user password' }
+New-MgUser -UserPrincipalName username@domainname –DisplayName 'Firstname Lastname' -GivenName 'Firstname' –Surname 'Lastname' -PasswordProfile $PasswordProfile -AccountEnabled -MailNickName 'email alias'
+
+($PasswordProfile = @{ Password = 'User.pw1' }
+New-MgUser –UserPrincipalName AllanD@Adatum.onmicrosoft.com –DisplayName 'Allan Deyoung' -GivenName 'Allan' –Surname 'Deyoung' -PasswordProfile $PasswordProfile -AccountEnabled -MailNickName 'AllanD')
+-----------------------------------------------------------------------------------------------------------------------------------
+
+PowerShell requires the Organization.Read.All permission scope to read the licenses available in the tenant.
+Connect-MgGraph -Scopes User.ReadWrite.All, Organization.Read.All
+
+To find the unlicensed synchronized users in your organization, run the following command.
+Get-MgUser -Filter 'assignedLicenses/$count eq 0 and OnPremisesSyncEnabled eq true' -ConsistencyLevel eventual -CountVariable unlicensedUserCount -All -Select UserPrincipalName
+
+You can only assign licenses to user accounts that have the UsageLocation property set to a valid ISO 3166-1 alpha-2 country/region code.
+To find accounts that don't have a UsageLocation value, run the following command.
+Get-MgUser -Select Id,DisplayName,Mail,UserPrincipalName,UsageLocation,UserType | where { $_.UsageLocation -eq $null -and $_.UserType -eq 'Member' }
+
+To set the UsageLocation value on an account, run the following command.
+$userUPN="<user sign-in name (UPN)>"
+$userLoc="<ISO 3166-1 alpha-2 country code>"
+
+Update-MgUser -UserId $userUPN -UsageLocation $userLoc
+
+(Update-MgUser -UserId "belindan@litwareinc.com" -UsageLocation US)
+
+To assign a license to a user, use the following command in Microsoft Graph PowerShell.
+Set-MgUserLicense -UserId $userUPN -AddLicenses @{SkuId = "<SkuId>"} -RemoveLicenses @()
+($e5Sku = Get-MgSubscribedSku -All | Where SkuPartNumber -eq 'SPE_E5'
+Set-MgUserLicense -UserId "belindan@litwareinc.com" -AddLicenses @{SkuId = $e5Sku.SkuId} -RemoveLicenses @())
+
+The following example assigns SPE_E5 (Microsoft 365 E5) and EMSPREMIUM (Enterprise Mobility + Security E5) to the user belindan@litwareinc.com:
+$e5Sku = Get-MgSubscribedSku -All | Where SkuPartNumber -eq 'SPE_E5'
+$e5EmsSku = Get-MgSubscribedSku -All | Where SkuPartNumber -eq 'EMSPREMIUM'
+$addLicenses = @(
+@{SkuId = $e5Sku.SkuId},
+@{SkuId = $e5EmsSku.SkuId}
+)
+
+Set-MgUserLicense -UserId "belinda@litwareinc.com" -AddLicenses $addLicenses -RemoveLicenses @()
+
+-----------------------------------------------------------------------------------------------------------
+
+Delete user accounts by using the Remove-MgUser command:
+Remove-MgUser -UserId '5c442efb-5e66-484a-936a-91b6810bed14'
+
+The following example shows how to restore this deleted user account using the Restore-MgDirectoryDeletedItem cmdlet:
+Restore-MgDirectoryDeletedItem -DirectoryObjectId '5c442efb-5e66-484a-936a-91b6810bed14'
+
+---------------------------------------------------------------------------------------------------------
+
+You can get the object ID of the user by using the Get-MgUser cmdlet to get a list of all the users. For example:
+
+Install-Module Microsoft.Graph -Scope CurrentUser
+Import-Module Microsoft.Graph.Identity.DirectoryManagement
+Connect-MgGraph -Scopes 'User.Read.All', 'RoleManagement.ReadWrite.Directory'
+Get-MgUser -All | Format-List ID, DisplayName, Mail, UserPrincipalName
+
+To retrieve the object ID of a particular role, you can run the following command to display a list of all activated directory roles:
+Get-MgDirectoryRole | Format-List
+
+Since you now have the object ID for both the user and the role, you can assign the user to the role by running the following commands.
+$UserObjectId = @{ "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/e4e2b110-8d4f-434f-a990-7cd63e23aed6" }
+
+New-MgDirectoryRoleMemberByRef -DirectoryRoleId 'a2d10e79-df32-47fc-86ef-64d199860810' -BodyParameter $UserObjectId
+
+
+In the prior example, only the Global Administrator role appeared in the list of activated roles when you ran the Get-MgDirectoryRole command. Let's assume you now want to assign Adele Vance to the Helpdesk Administrator role. Since the role isn't in the list, it's not active. As such, you can't assign Adele to the role. To resolve this issue, you must first activate the Helpdesk Administrator role by using its corresponding directory role template ID.
+
+To do so, you must acquire the object ID of both the role and the role's template. You can then activate the role from the role template by running the New-MgDirectoryRole cmdlet. The following example displays the PowerShell commands required to complete these steps.
+
+# Run the following steps to activate the Helpdesk Administrator role.
+
+# Step 1 - Run the Get-MgDirectoryRoleTemplate command to display the list of templates for all Microsoft Entra roles. Since you plan to activate the Helpdesk Administrator role from the Helpdesk Administrator role template, you must run the command to get the object Id of this role template.
+
+Get-MgDirectoryRoleTemplate -All | Format-List ID, DisplayName
+
+Id          : a2d10e79-df32-47fc-86ef-64d199860810
+DisplayName : Global Administrator
+
+Id          : fe930be7-5e62-47db-91af-98c3a49a38b1
+DisplayName : User Administrator
+
+Id          : 95e79109-95c0-4d8e-aee3-d01accf2d47b
+DisplayName : Helpdesk Administrator
+
+and so on...
+
+# Step 2 - Activate the directory role that's based on the Helpdesk Administrator role template. Copy and paste the object Id of the Helpdesk Administrator role template from the prior command into this New-MgDirectoryRole command.
+
+New-MgDirectoryRole -roleTemplateId '95e79109-95c0-4d8e-aee3-d01accf2d47b'
+
+# Step 3 - Verify the Helpdesk Administrator role now appears in the list of activated roles. When you ran the Get-MgDirectoryRole command in the prior example, only the Global Administrator role appeared. After activating the Helpdesk Administrator role from its template, this role should now appear along with the Global Administrator role.
+
+Get-MgDirectoryRole | Format-List
+
+DeletedDateTime      :
+Description          : Can reset passwords for non-administrators and Helpdesk Administrators.
+DisplayName          : Helpdesk Administrator
+Id                  : 227ec638-37b9-4eb7-a661-2773dcce2b36
+Members              :
+RoleTemplateId      : 95e79109-95c0-4d8e-aee3-d01accf2d47b
+ScopedMembers        :
+AdditionalProperties : {}
+
+DeletedDateTime      :
+Description          : Can manage all aspects of Microsoft Entra ID and Microsoft services that use Microsoft Entra identities.
+DisplayName          : Global Administrator
+Id                  : a2d10e79-df32-47fc-86ef-64d199860810
+Members              :
+RoleTemplateId      : 1f12db9c-dbb3-410d-a893-4c0bc322bf85
+ScopedMembers        :
+AdditionalProperties : {}
+
+
+After you verified that you activated the Helpdesk Administrator role in Step 3, you must run the following commands to assign Adele Vance to the role.
+The first command sets the value of the variable $UserObjectId to Adele Vance's object ID.
+The second command uses the New-MgDirectoryRoleMemberRef cmdlet to assign the value of this variable to the Helpdesk Administrator role. This role is the directory role defined by the DirectoryRoleId.
+
+$UserObjectId = @{ "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/dba12422-ac75-486a-a960-cd7cb3f6963f" }
+
+New-MgDirectoryRoleMemberByRef -DirectoryRoleId '227ec638-37b9-4eb7-a661-2773dcce2b36' -BodyParameter $UserObjectId
+
+--------------------------------------------------------------------------------------------------------------------------
+
+Use the New-MgGroup command to create a role group.
+Connect-MgGraph -Scopes "Group.ReadWrite.All"
+
+$group = New-MgGroup -DisplayName "Contoso_Helpdesk_Administrators" -Description "Helpdesk Administrator role assigned to group" -MailEnabled:$false -SecurityEnabled -MailNickName "contosohelpdeskadministrators" -IsAssignableToRole:$true
+
+Use the Get-MgRoleManagementDirectoryRoleDefinition command to get a role definition.
+$roleDefinition = Get-MgRoleManagementDirectoryRoleDefinition -Filter "displayName eq 'Helpdesk Administrator'"
+
+Use the New-MgRoleManagementDirectoryRoleAssignment command to assign the role.
+$roleAssignment = New-MgRoleManagementDirectoryRoleAssignment -DirectoryScopeId '/' -RoleDefinitionId $roleDefinition.Id -PrincipalId $group.Id
+
+

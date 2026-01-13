@@ -1,0 +1,180 @@
+student5@it1education.onmicrosoft.com
+
+Zonder uit te voeren, hoe zou je een VM aanmaken?
+
+Compute -> VM -> Create
+
+az deployment group create --resource-group Student5_RG_01 --template-file storacc.bicep --parameters storageAccountName=storaccbicep5
+
+1. Linux VM aanmaken met Azure PowerShell
+We maken een VM genaamd MarketplaceVM aan in het subnet dat je eerder hebt gemaakt.
+
+PowerShell
+
+# Variabelen instellen
+$rg = "JouwResourceGroep" # Vervang door de naam van je resourcegroep
+$loc = "West Europe"
+$vnetName = "vnet-two"
+$subnetName = "subnet-1"
+
+# VM aanmaken (eenvoudige methode)
+New-AzVm `
+    -ResourceGroupName $rg `
+    -Name "MarketplaceVM" `
+    -Location $loc `
+    -VirtualNetworkName $vnetName `
+    -SubnetName $subnetName `
+    -Image "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest" `
+    -Size "Standard_B1s" `
+    -GenerateSshKey `
+    -OpenPorts 22
+
+2. De bestaande VM klonen
+In Azure bestaat er geen directe "Clone" knop in PowerShell. De officiële manier is om een Snapshot te maken van de OS-schijf, daar een nieuwe Managed Disk van te maken en vervolgens een nieuwe VM te spinnen op basis van die schijf.
+
+PowerShell
+
+# 1. Haal de gegevens op van de bron-VM
+$vm = Get-AzVM -ResourceGroupName $rg -Name "MarketplaceVM"
+
+# 2. Maak een snapshot van de OS-schijf
+$snapshotConfig = New-AzSnapshotConfig `
+    -SourceResourceId $vm.StorageProfile.OsDisk.ManagedDisk.Id `
+    -Location $loc `
+    -CreateOption Copy
+
+$snapshot = New-AzSnapshot `
+    -Snapshot $snapshotConfig `
+    -ResourceGroupName $rg `
+    -SnapshotName "MarketplaceVM-Snapshot"
+
+# 3. Maak een nieuwe Managed Disk van de snapshot
+$diskConfig = New-AzDiskConfig `
+    -Location $loc `
+    -CreateOption Copy `
+    -SourceResourceId $snapshot.Id
+
+$clonedDisk = New-AzDisk `
+    -Disk $diskConfig `
+    -ResourceGroupName $rg `
+    -DiskName "ClonedDisk"
+
+# 4. Maak de gekloonde VM aan (VM2)
+$vmConfig = New-AzVMConfig -VMName "ClonedVM" -VMSize "Standard_B1s"
+$vmConfig = Set-AzVMOSDisk -VM $vmConfig -ManagedDiskId $clonedDisk.Id -CreateOption Attach -Linux
+
+# Voeg netwerk toe (hergebruik vnet-two)
+$vnet = Get-AzVirtualNetwork -ResourceGroupName $rg -Name $vnetName
+$subnet = Get-AzVirtualNetworkSubnetConfig -VirtualNetwork $vnet -Name $subnetName
+$nic = New-AzNetworkInterface -Name "ClonedVM-NIC" -ResourceGroupName $rg -Location $loc -SubnetId $subnet.Id
+
+$vmConfig = Add-AzVMNetworkInterface -VM $vmConfig -Id $nic.Id
+
+# Finale: Bouw de gekloonde VM
+New-AzVM -ResourceGroupName $rg -Location $loc -VM $vmConfig
+3. Alle extra VM's verwijderen
+Om snel alle VM's binnen je resourcegroep op te ruimen zonder de hele resourcegroep te verwijderen:
+
+PowerShell
+
+$vms = Get-AzVM -ResourceGroupName $rg
+
+foreach ($vm in $vms) {
+    Write-Host "Verwijderen van: $($vm.Name)"
+    Remove-AzVM -ResourceGroupName $rg -Name $vm.Name -Force
+}
+Let op: Remove-AzVM verwijdert standaard alleen de VM-resource zelf. De disks en netwerkkaarten (NIC's) blijven vaak achter als 'orphan resources'.
+
+
+
+Type:
+
+General purpose:
+A
+B
+D
+DC
+
+Compute optimized:
+F
+FX
+
+Memory Optimized
+E
+Eb
+EC
+M
+
+Storage optimized
+L
+
+GPU accelerated
+NC
+ND
+NG
+NV
+
+FGPA accelerated
+NP
+
+High performance compute
+HB
+HC
+HX
+
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmSize": {
+      "value": "Standard_DS1_v2"
+    },
+    "adminUsername": {
+      "value": "localadmin"
+    }
+  }
+}
+
+
+
+PS:
+
+Stop-AzVM [-Name] <String> [-Force] [-StayProvisioned] [-NoWait] [-SkipShutdown] [-ResourceGroupName] [-AsJob] [-DefaultProfile <IAzureContextContainer>] [-WhatIf] [-Confirm] [<CommonParameters>]
+
+Start-AzVM -ResourceGroupName Student5_RG_01 -Name WinServer2022
+
+Stop-AzVM -Name "WinServer2022" -ResourceGroupName "Student5-RG01" -Force
+
+CLI:
+
+az vm start --resource-group Student5_RG_01 --name WinServer2022 --subscription ed11a593-8510-42c9-ae74-da25ef615692
+
+az vm stop --resource-group Student5_RG_01 --name WinServer2022 --subscription ed11a593-8510-42c9-ae74-da25ef615692
+
+
+
+Bekijk hoe we via Powershell alle VM's kunnen opvragen
+Get-AzVM | Select-Object Name, ResourceGroupName, Location
+
+Hoe kunnen we alle running VM's opvragen en deze stoppen
+Get-AzVM | ForEach-Object { Get-AzVM -ResourceGroupName $_.ResourceGroupName -Name $_.Name -Status } | Where-Object { $_.Statuses.Code -match "PowerState/running" } | Stop-AzVM -Force
+
+Hoe kunnen we alle VM's terug opstarten
+Get-AzVM | Start-AzVM
+
+az container create --resource-group Student5_RG_02 --name mycontainer-student5 --image httpd:latest --dns-name-label aci-demo-student5 --ports 80 443 --cpu 1 --memory 1 --os-type Linux
+
+hello-container-student5.hmcve7a2g7abgqc5.northeurope.azurecontainer.io
+
+https://prod-250.westeurope.logic.azure.com:443/workflows/515192f231e24128b1dbf3ab7db1dfba/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=3F3d4luCl0LbD11NX4_2Il-HPq5iGej7sMaPFG22X-A
+
+
+$connectTestResult = Test-NetConnection -ComputerName storagestudent5.file.core.windows.net -Port 445
+if ($connectTestResult.TcpTestSucceeded) {
+    # Save the password so the drive will persist on reboot
+    cmd.exe /C "cmdkey /add:`"storagestudent5.file.core.windows.net`" /user:`"localhost\storagestudent5`" /pass:`"kB0G0OGSoZGRHr1HXl5qY93gNhV12zkjb+5/EfYCHaH9HB6I8cUo43pnmvhRo0RT03zoY4iBXy86+AStAsts3g==`""
+    # Mount the drive
+    New-PSDrive -Name Z -PSProvider FileSystem -Root "\\storagestudent5.file.core.windows.net\student5-share" -Persist
+} else {
+    Write-Error -Message "Unable to reach the Azure storage account via port 445. Check to make sure your organization or ISP is not blocking port 445, or use Azure P2S VPN, Azure S2S VPN, or Express Route to tunnel SMB traffic over a different port."
+}
