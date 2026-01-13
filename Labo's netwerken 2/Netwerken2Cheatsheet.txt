@@ -1,0 +1,249 @@
+Routes:
+static:
+ip route <netwerk ip adres> <subnet mask> <next-hop|exit port> <AD>
+show ip route
+
+default:
+ip route 0.0.0.0 0.0.0.0 <ip address default gateway>
+
+RIP:
+router rip
+version 2
+network <ip-address van de netwerken waarmee router direct is verbonden>
+no auto-summary
+
+"show ip protocols"
+----------------------------------------------------------------------------------
+Switch security:
+poorten uit:
+int range f0/1-24
+shutdown
+
+sticky mac (beperken aantal mac-adressen op 1 poort):
+int f0/1-24
+switchport mode access
+switchport port-security
+switchport port-security maximum <1, 2 ...>
+switchport port-security mac-address sticky
+switchport port-security violation <shutdown, restrict (log bericht), protect (stil)>
+
+SSH activeren:
+S1(config)# ip domain-name <cisco.com>​
+S1(config)# crypto key generate rsa​
+S1(config)# username <admin> secret <ccna​>
+S1(config)# line vty 0 15​
+S1(config-line)# transport input ssh​
+S1(config-line)# login local​
+S1(config-line)# exit​
+S1(config)# ip ssh version 2​
+------------------------------------------------------------------------------------
+Vlan aanmaken:
+S1# config t
+S1(config)#vlan 10
+S1(config-vlan)#name Administratie
+S1(config-vlan)#vlan 20
+S1(config-vlan)#name Sales
+S1(config-vlan)#vlan 30
+S1(config-vlan)#name guest
+S1(config-vlan)#vlan 99
+S1(config-vlan)#name management
+S1(config-vlan)#end
+
+Poort in access mode plaatsen:
+S1(config)#interface range fa0/6-24
+S1(config-if-range)#switchport mode access
+
+"show vlan brief"
+
+Vlan's aan fysieke poorten verbinden
+S1(config)#interface range fa0/6-10
+S1(config-if-range)#switchport access vlan 30
+S1(config-if-range)#interface range fa0/11-17
+S1(config-if-range)#switchport access vlan 10
+S1(config-if-range)#interface range fa0/18-23
+S1(config-if-range)#switchport access vlan 20
+S1(config-if-range)#interface fa0/24
+S1(config-if-range)#switchport access vlan 99
+
+Poort in trunk mode plaatsen:
+S1(config)#interface range fa0/1-5
+S1(config-if-range)#switchport mode trunk
+switchport trunk encapsulation dot1q
+S1(config-if-range)#switchport trunk native vlan 1666
+S1(config-if-range)#switchport trunk allowed vlan 10,20,30,99
+S1(config-if-range)#no shutdown
+S1(config-if-range)#end
+
+"show interfaces f0/1 switchport"
+"show interface trunk"
+
+Management Vlan
+S1(config)#interface vlan 99
+S1(config-if)#ip address 192.168.99.254 255.255.255.0
+S1(config-if)#no shutdown
+
+-------------------------------------------------------------------------------
+Router instellingen (ROAS)
+
+R1#config t
+R1(config)# interface g0/0
+R1(config-if)# no shutdown
+R1(config-if)# exit
+R1(config)# interface g0/0.10
+R1(config-subif)# encapsulation dot1q 10
+R1(config-subif)# Ip address 192.168.10.1 255.255.255.240
+R1(config-subif)#exit
+R1(config)# interface GigabitEthernet0/0.20
+R1(config-subif)# encapsulation dot1Q 20
+R1(config-subif)# ip address 192.168.20.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface GigabitEthernet0/0.30
+R1(config-subif)# encapsulation dot1Q 30
+R1(config-subif)# ip address 192.168.30.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface GigabitEthernet0/0.99
+R1(config-subif)# encapsulation dot1Q 99
+R1(config-subif)# ip address 192.168.99.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface GigabitEthernet0/0.1666
+R1(config-subif)# encapsulation dot1Q 1666 native
+R1(config-subif)# ip address 192.168.166.1 255.255.255.0
+R1(config-subif)# no shutdown
+
+--------------------------------------------------------------------------------
+ACL
+speciale adressen:
+access-list permit <192.168.10.10> 0.0.0.0 !adres voor 1 gebruiker wordt ->
+access-list 1 permit host 192.168.10.10 
+
+access-list 1 permit 0.0.0.0 255.255.255.255 ! adres voor alle gebruikers ->
+access-list 1 permit any
+
+naam geven aan access-list:
+ip access-list standard <NO_ACCESS>
+deny host 192.168.11.10
+permit any
+exit
+interface g0/0
+ip access-group NO_ACCESS out
+
+ACL toekennen aan poort:
+access-list 1 permit <192.168.10.0> <0.0.0.255>
+interface serial0/0/0
+ip access-group 1 out
+
+access-list 1 deny host 192.168.10.10		!Specifiek adres blokkeren
+access-list 1 permit 192.168.10.0 0.0.0.255 !Range toestaan
+interface s0/0/0
+ip access-group 1 out						!op de poort geplakt
+
+bijplaatsen van entry:
+ip access-list standard NO-ACCESS
+deny host 192.168.11.11
+end
+
+
+Vty lijn beveiligen met ACL:
+line vty 0 15
+access-class 21 in
+exit
+access-list 21 permit 192.168.10.0 0.0.0.255
+access-list deny any
+
+show access-list
+----------------------------------------------------------------------------------
+Router als DHCP server
+R1(config)# ip dhcp pool LAN-POOL-2
+R1(dhcp-config)# network 192.168.11.0 255.255.255.0
+
+R1(dhcp-config)# default-router 192.168.11.1
+R1(dhcp-config)# dns-server 192.168.11.5
+R1(dhcp-config)# domain-name example.com
+R1(dhcp-config)# exit
+
+R1(config)# ip dhcp excluded-address 192.168.11.1 192.168.11.9
+R1(config)# ip dhcp excluded-address 192.168.11.254
+
+“show running-config | section dhcp”
+”show ip dhcp binding”
+“show ip dhcp server statistics”
+
+DHCP adres ontvangen op poort van router: (kant van ISP om publiek adres te krijgen)
+R1(config)# interface g0/1
+R1(config-if)# ip address dhcp
+R1(config-if)# no shutdown
+
+DHCP relay agent:
+R1(config)# interface g0/0
+R1(config-if)# ip helper-address 192.168.11.6
+R1(config-if)# exit
+-----------------------------------------------------------------------------------
+NAT & PAT
+Static NAT (1 private voor 1 publiek)
+R1(config)# ip nat inside source static 192.168.11.99 209.165.201.5
+R1(config)# interface S0/0/0
+R1(config-if)# ip nat inside
+R1(config-if)# interface S0/1/0
+R1(config-if)# ip nat outside
+
+Dynamic NAT (pool publiek)
+R1(config)# ip nat pool “name” 209.165.200.241 209.165.200.250 netmask 255.255.255.224
+R1(config)# access-list 2 permit 192.168.10.0 0.0.0.255
+R1(config)# ip nat inside source list 2 pool “name”
+R1(config)# interface S0/0/0
+R1(config-if)# ip nat inside
+R1(config-if)# interface S0/1/0
+R1(config-if)# ip nat outside
+
+PAT
+R1(config)# ip nat pool “name” 209.165.200.241 209.165.200.241 netmask 255.255.255.224
+R1(config)# access-list 2 permit 192.168.10.0 0.0.0.255
+R1(config)# ip nat inside source list 2 pool “name” overload
+R1(config)# interface S0/0/0
+R1(config-if)# ip nat inside
+R1(config-if)# interface S0/1/0
+R1(config-if)# ip nat outside
+
+Port forwarding
+R1(config)# ip nat inside source static tcp 192.168.10.254 80 209.165.201.5 8080
+R1(config)# interface S0/0/0
+R1(config-if)# ip nat inside
+R1(config-if)# interface S0/1/0
+R1(config-if)# ip nat outside
+
+"show ip nat translations"
+"show ip nat statistics"
+"show logging"
+--------------------------------------------------------------------------------
+CDP
+"show cdp"
+"show cdp neighbors"
+"show cdp interface"
+
+op alle interfaces enablen:
+cdp run
+no cpd run (uitzetten)
+
+"show lldp"
+...
+
+NTP
+clock set 00:00:00 month day year
+"show clock"
+
+NTP server:
+NTP server <ip>
+"show ntp status"
+"show ntp associations"
+
+
+SYSLOG
+logging console
+logging buffered
+show logging
+
+syslog naar server laten sturen:
+R1(config)# logging 192.168.1.3
+R1(config)# logging trap 4
+R1(config)# logging source-interface g0/0
+---------------------------------------------------------------------------------

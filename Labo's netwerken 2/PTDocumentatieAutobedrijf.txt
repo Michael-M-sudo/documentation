@@ -1,0 +1,770 @@
+Netwerk bestaat uit 2 routers verbonden met seriële verbinding
+3 switches per router; 1 core, 2 access
+netwerk van hoofdkantoor krijgt ook een server
+
+switch hoofdkantoor, kantoorruimte is SW-HK-K
+switch hoofdkantoor, magazijn is SW-HK-M
+switch hoofdkantoor, core is SW-HK-Core
+router hoofdkantoor is nat-router-HK
+server hoofdkantoor is Server-HK-K
+
+Switch nieuw kantoor, kantoor is SW-NK-K
+Switch nieuw kantoor, magazijn is SW-NK-M
+switch nieuw kantoor, core is SW-NK-Core
+router nieuw kantoor is R-NK
+
+2 routers zijn met elkaar verbonden via Se0/0/0 naar Se0/0/0
+G0/0 poort van router Nat-router-HK is verbonden met G0/1 poort van SW-HK-Core
+Fa0/24 poort van SW-HK-K is verbonden met poort fa0/24 van SW-HK-Core
+Fa0/24 poort van SW-HK-M is verbonden met poort fa0/23 van SW-HK-Core
+
+G0/0 poort van router R-NK is verbonden met G0/1 poort van SW-NK-Core
+Fa0/24 poort van SW-NK-K is verbonden met poort fa0/24 van SW-NK-Core
+Fa0/24 poort van SW-NK-M is verbonden met poort fa0/23 van SW-NK-Core
+
+Server-HK-K Fa0/0 poort verbonden met fa0/23 van SW-HK-K
+
+
+Volgende Vlan's per switch:
+SW-HK-K managment vlan 10: 192.168.10.0/24 met DG 192.168.10.66
+		finance vlan 20 192.168.20.0/24 met DG 192.168.20.66
+		HR vlan 30 192.168.30.0/24 met DG 192.168.30.66
+		administratie vlan 40 192.168.40.0/24 met DG 192.168.40.66
+		Wifi vlan 50 192.168.50.0/24 met DG 192.168.50.66
+		mgmt vlan 210 met DG 192.168.210.66
+		native vlan 220
+
+SW-HK-M IT vlan 60 192.168.60.0/24 met DG 192.168.60.66
+		productie vlan 70 192.168.70.0/24 met DG 192.168.70.66
+		logistiek vlan 80 192.168.80.0/24 met DG 192.168.80.66
+		technische support vlan 90 192.168.90.0/24 met DG 192.168.90.66
+		Wifi vlan 50 192.168.50.0/24 met DG 192.168.50.66
+		mgmt vlan 210 met DG 192.168.210.66
+		native vlan 220
+
+SW-NK-K HR vlan 130 192.168.130.0/24 met DG 192.168.130.66
+		administratie vlan 140 192.168.140.0/24 met DG 192.168.140.66
+		calculatie vlan 100 192.168.100.0/24 met DG 192.168.100.66
+		engineering vlan 110 192.168.110.0/24 met DG 192.168.110.66
+		Wifi vlan 150 192.168.150.0/24 met DG 192.168.150.66
+		Mgmt vlan 210 met DG 192.168.210.66
+		Native vlan 220
+		
+SW-NK-M IT vlan 160 192.168.160.0/24 met DG 192.168.160.66
+		productie vlan 170 192.168.170.0/24 met DG 192.168.170.66
+		logistiek vlan 180 192.168.180.0/24 met DG 192.168.180.66
+		technische support vlan 190 192.168.190.0/24 met DG 192.168.190.66
+		Wifi 150 192.168.150.0/24 met DG 192.168.150.66
+		Mgmt vlan 210 met DG 192.168.210.66
+		Native vlan 220
+		
+netwerken bepalen:
+10.0.0.0/30 tussen routers, Nat-router-HK krijgt IP adres 10.0.0.1 op s0/0/0
+							R-NK krijgt ip adres 10.0.0.2 op s0/0/0
+							
+							
+							
+Commands:
+enable
+configure terminal
+
+! --- Basis Configuratie ----Nat-router-HK-----------------------------------------------------
+hostname nat-router-HK
+line console 0
+ secret cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+! --- Seriële Interface (WAN Link) ---
+interface Serial0/0/0
+ ip address 10.0.0.1 255.255.255.252
+ no shutdown
+ ip nat inside
+
+! --- Externe Interface (Internet) ---
+interface GigabitEthernet0/1
+ ip address 203.0.113.1 255.255.255.0 ! Voorbeeld publiek IP
+ no shutdown
+ ip nat outside
+
+! --- Inter-VLAN Routing Subinterfaces (LAN) ---
+! Trunk verbinding met SW-HK-Core
+interface GigabitEthernet0/0
+ no ip address
+ no shutdown
+
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.66 255.255.255.0
+ ip helper-address 192.168.10.10 ! DHCP server
+ ip nat inside
+ description Management VLAN
+
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description Finance VLAN
+
+interface GigabitEthernet0/0.30
+ encapsulation dot1Q 30
+ ip address 192.168.30.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description HR VLAN
+
+interface GigabitEthernet0/0.40
+ encapsulation dot1Q 40
+ ip address 192.168.40.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description Administratie VLAN
+
+interface GigabitEthernet0/0.50
+ encapsulation dot1Q 50
+ ip address 192.168.50.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description Wifi HK VLAN
+ ip access-group NO_WIFI_TO_MGMT out ! Toepassen ACL
+
+interface GigabitEthernet0/0.60
+ encapsulation dot1Q 60
+ ip address 192.168.60.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description IT HK VLAN
+
+interface GigabitEthernet0/0.70
+ encapsulation dot1Q 70
+ ip address 192.168.70.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description Productie HK VLAN
+ ip access-group NO_PROD_TO_SERVER out ! Toepassen ACL
+
+interface GigabitEthernet0/0.80
+ encapsulation dot1Q 80
+ ip address 192.168.80.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description Logistiek HK VLAN
+
+interface GigabitEthernet0/0.90
+ encapsulation dot1Q 90
+ ip address 192.168.90.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description Technische Support HK VLAN
+
+interface GigabitEthernet0/0.210
+ encapsulation dot1Q 210
+ ip address 192.168.210.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ ip nat inside
+ description Switch Management VLAN
+
+interface GigabitEthernet0/0.220
+ encapsulation dot1Q 220 native
+ no ip address
+ description Native VLAN
+
+! --- Statische Routes naar Nieuw Kantoor (productielocatie) ---
+ip route 192.168.100.0 255.255.255.0 10.0.0.2
+ip route 192.168.110.0 255.255.255.0 10.0.0.2
+ip route 192.168.130.0 255.255.255.0 10.0.0.2
+ip route 192.168.140.0 255.255.255.0 10.0.0.2
+ip route 192.168.150.0 255.255.255.0 10.0.0.2
+ip route 192.168.160.0 255.255.255.0 10.0.0.2
+ip route 192.168.170.0 255.255.255.0 10.0.0.2
+ip route 192.168.180.0 255.255.255.0 10.0.0.2
+ip route 192.168.190.0 255.255.255.0 10.0.0.2
+
+! --- Default Route naar Internet ---
+ip route 0.0.0.0 0.0.0.0 GigabitEthernet0/1
+
+! --- NAT Configuratie (PAT - Port Address Translation) ---
+ip nat inside source list NAT_ACL interface GigabitEthernet0/1 overload
+
+ip access-list standard NAT_ACL
+ permit 192.168.10.0 0.0.0.255
+ permit 192.168.20.0 0.0.0.255
+ permit 192.168.30.0 0.0.0.255
+ permit 192.168.40.0 0.0.0.255
+ permit 192.168.50.0 0.0.0.255
+ permit 192.168.60.0 0.0.0.255
+ permit 192.168.70.0 0.0.0.255
+ permit 192.168.80.0 0.0.0.255
+ permit 192.168.90.0 0.0.0.255
+ permit 192.168.210.0 0.0.0.255
+! Voeg hier ook de NK-netwerken toe die via de HK-router naar internet moeten
+ permit 192.168.100.0 0.0.0.255
+ permit 192.168.110.0 0.0.0.255
+ permit 192.168.130.0 0.0.0.255
+ permit 192.168.140.0 0.0.0.255
+ permit 192.168.150.0 0.0.0.255
+ permit 192.168.160.0 0.0.0.255
+ permit 192.168.170.0 0.0.0.255
+ permit 192.168.180.0 0.0.0.255
+ permit 192.168.190.0 0.0.0.255
+
+! --- ACL's voor Beveiligingsvoorwaarden ---
+ip access-list extended NO_WIFI_TO_MGMT
+ deny ip 192.168.50.0 0.0.0.255 192.168.210.0 0.0.0.255 ! Blokkeer WiFi HK naar Mgmt VLAN
+ permit ip any any
+
+ip access-list extended NO_PROD_TO_SERVER
+ deny ip 192.168.70.0 0.0.0.255 host 192.168.10.10 ! Blokkeer Productie HK naar Server-HK-K
+ permit ip any any
+
+end
+copy run start
+
+
+! --- Basis Configuratie --------R-NK-------------------------------------------------------------------
+enable
+configure terminal
+hostname R-NK
+line console 0
+ password cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+
+! --- Seriële Interface (WAN Link) ---
+interface Serial0/0/0
+ ip address 10.0.0.2 255.255.255.252
+ no shutdown
+
+! --- Inter-VLAN Routing Subinterfaces (LAN) ---
+! Trunk verbinding met SW-NK-Core
+interface GigabitEthernet0/0
+ no ip address
+ no shutdown
+
+interface GigabitEthernet0/0.100
+ encapsulation dot1Q 100
+ ip address 192.168.100.66 255.255.255.0
+ ip helper-address 192.168.10.10 ! DHCP server
+ description Calculatie VLAN
+
+interface GigabitEthernet0/0.110
+ encapsulation dot1Q 110
+ ip address 192.168.110.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description Engineering VLAN
+
+interface GigabitEthernet0/0.130
+ encapsulation dot1Q 130
+ ip address 192.168.130.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description HR NK VLAN
+
+interface GigabitEthernet0/0.140
+ encapsulation dot1Q 140
+ ip address 192.168.140.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description Administratie NK VLAN
+
+interface GigabitEthernet0/0.150
+ encapsulation dot1Q 150
+ ip address 192.168.150.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description Wifi NK VLAN
+ ip access-group NO_WIFI_TO_MGMT_NK out ! Toepassen ACL
+
+interface GigabitEthernet0/0.160
+ encapsulation dot1Q 160
+ ip address 192.168.160.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description IT NK VLAN
+
+interface GigabitEthernet0/0.170
+ encapsulation dot1Q 170
+ ip address 192.168.170.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description Productie NK VLAN
+ ip access-group NO_PROD_TO_SERVER_NK out ! Toepassen ACL
+
+interface GigabitEthernet0/0.180
+ encapsulation dot1Q 180
+ ip address 192.168.180.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description Logistiek NK VLAN
+
+interface GigabitEthernet0/0.190
+ encapsulation dot1Q 190
+ ip address 192.168.190.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description Technische Support NK VLAN
+
+interface GigabitEthernet0/0.210
+ encapsulation dot1Q 210
+ ip address 192.168.210.66 255.255.255.0
+ ip helper-address 192.168.10.10
+ description Switch Management VLAN
+
+interface GigabitEthernet0/0.220
+ encapsulation dot1Q 220 native
+ no ip address
+ description Native VLAN
+
+! --- Statische Routes naar Hoofdkantoor ---
+ip route 192.168.10.0 255.255.255.0 10.0.0.1
+ip route 192.168.20.0 255.255.255.0 10.0.0.1
+ip route 192.168.30.0 255.255.255.0 10.0.0.1
+ip route 192.168.40.0 255.255.255.0 10.0.0.1
+ip route 192.168.50.0 255.255.255.0 10.0.0.1
+ip route 192.168.60.0 255.255.255.0 10.0.0.1
+ip route 192.168.70.0 255.255.255.0 10.0.0.1
+ip route 192.168.80.0 255.255.255.0 10.0.0.1
+ip route 192.168.90.0 255.255.255.0 10.0.0.1
+ip route 192.168.210.0 255.255.255.0 10.0.0.1
+
+! --- Default Route naar Hoofdkantoor (voor internettoegang via HK) ---
+ip route 0.0.0.0 0.0.0.0 10.0.0.1
+
+! --- ACL's voor Beveiligingsvoorwaarden ---
+ip access-list extended NO_WIFI_TO_MGMT_NK
+ deny ip 192.168.150.0 0.0.0.255 192.168.210.0 0.0.0.255 ! Blokkeer WiFi NK naar Mgmt VLAN
+ permit ip any any
+
+ip access-list extended NO_PROD_TO_SERVER_NK
+ deny ip 192.168.170.0 0.0.0.255 host 192.168.10.10 ! Blokkeer Productie NK naar Server-HK-K
+ permit ip any any
+
+
+end
+copy run start
+
+
+
+! --- Basis Configuratie --- SW-HK-Core -----------------------------------------
+hostname SW-HK-Core
+line console 0
+ password cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+! --- VLAN Creatie ---
+vlan 10
+ name Management_HK
+vlan 20
+ name Finance_HK
+vlan 30
+ name HR_HK
+vlan 40
+ name Administratie_HK
+vlan 50
+ name Wifi_HK
+vlan 60
+ name IT_HK
+vlan 70
+ name Productie_HK
+vlan 80
+ name Logistiek_HK
+vlan 90
+ name Tech_Support_HK
+vlan 210
+ name Switch_Management
+vlan 220
+ name Native_VLAN
+
+! --- Management IP (SVI) ---
+interface Vlan210
+ ip address 192.168.210.2 255.255.255.0
+ no shutdown
+ip default-gateway 192.168.210.66
+
+! --- Poort Configuratie ---
+! Uplink naar Router
+interface GigabitEthernet0/1
+ description Uplink to nat-router-HK
+ switchport mode trunk
+
+! Uplink naar SW-HK-K
+interface FastEthernet0/24
+ description Uplink to SW-HK-K
+ switchport mode trunk
+
+! Uplink naar SW-HK-M
+interface FastEthernet0/23
+ description Uplink to SW-HK-M
+ switchport mode trunk
+
+end
+write memory
+
+
+
+! --- Basis Configuratie -------- SW-HK-K
+hostname SW-HK-K
+line console 0
+ password cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+! --- VLAN Creatie ---
+vlan 10
+ name Management_HK
+vlan 20
+ name Finance_HK
+vlan 30
+ name HR_HK
+vlan 40
+ name Administratie_HK
+vlan 50
+ name Wifi_HK
+vlan 210
+ name Switch_Management
+vlan 220
+ name Native_VLAN
+
+! --- Management IP (SVI) ---
+interface Vlan210
+ ip address 192.168.210.3 255.255.255.0
+ no shutdown
+ip default-gateway 192.168.210.66
+
+! --- Poort Configuratie ---
+! Uplink naar SW-HK-Core
+interface FastEthernet0/24
+ description Uplink to SW-HK-Core
+ switchport mode trunk
+
+! Poort voor Server-HK-K
+interface FastEthernet0/23
+ description Connection to Server-HK-K (DHCP Server)
+ switchport mode access
+ switchport access vlan 10
+
+
+! --- Access Poorten per VLAN (3 poorten per VLAN) ---
+
+! VLAN 10 (Management)
+interface range FastEthernet0/1 - 3
+ description Access port for Management VLAN 10
+ switchport mode access
+ switchport access vlan 10
+ 
+
+! VLAN 20 (Finance)
+interface range FastEthernet0/4 - 6
+ description Access port for Finance VLAN 20
+ switchport mode access
+ switchport access vlan 20
+
+
+! VLAN 30 (HR)
+interface range FastEthernet0/7 - 9
+ description Access port for HR VLAN 30
+ switchport mode access
+ switchport access vlan 30
+ 
+
+! VLAN 40 (Administratie)
+interface range FastEthernet0/10 - 12
+ description Access port for Administratie VLAN 40
+ switchport mode access
+ switchport access vlan 40
+
+
+! VLAN 50 (Wifi HK - voor AP's)
+interface range FastEthernet0/13 - 15
+ description Access port for Wifi AP VLAN 50
+ switchport mode access
+ switchport access vlan 50
+ 
+
+end
+write memory
+
+
+
+! --- Basis Configuratie ----- SW-HK-M ------------------
+hostname SW-HK-M
+line console 0
+ password cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+! --- VLAN Creatie ---
+vlan 50
+ name Wifi_HK
+vlan 60
+ name IT_HK
+vlan 70
+ name Productie_HK
+vlan 80
+ name Logistiek_HK
+vlan 90
+ name Tech_Support_HK
+vlan 210
+ name Switch_Management
+vlan 220
+ name Native_VLAN
+
+! --- Management IP (SVI) ---
+interface Vlan210
+ ip address 192.168.210.4 255.255.255.0
+ no shutdown
+ip default-gateway 192.168.210.66
+
+! --- Poort Configuratie ---
+! Uplink naar SW-HK-Core
+interface FastEthernet0/24
+ description Uplink to SW-HK-Core
+ switchport mode trunk
+
+! --- Access Poorten per VLAN (3 poorten per VLAN) ---
+
+! VLAN 50 (Wifi HK - voor AP's)
+interface range FastEthernet0/1 - 3
+ description Access port for Wifi AP VLAN 50
+ switchport mode access
+ switchport access vlan 50
+
+! VLAN 60 (IT)
+interface range FastEthernet0/4 - 6
+ description Access port for IT VLAN 60
+ switchport mode access
+ switchport access vlan 60
+
+! VLAN 70 (Productie)
+interface range FastEthernet0/7 - 9
+ description Access port for Productie VLAN 70
+ switchport mode access
+ switchport access vlan 70
+
+! VLAN 80 (Logistiek)
+interface range FastEthernet0/10 - 12
+ description Access port for Logistiek VLAN 80
+ switchport mode access
+ switchport access vlan 80
+
+! VLAN 90 (Technische Support)
+interface range FastEthernet0/13 - 15
+ description Access port for Tech Support VLAN 90
+ switchport mode access
+ switchport access vlan 90
+
+end
+write memory
+
+
+! --- Basis Configuratie ------ SW-NK-Core -----------------------------------------
+hostname SW-NK-Core
+line console 0
+ password cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+! --- VLAN Creatie ---
+vlan 100
+ name Calculatie_NK
+vlan 110
+ name Engineering_NK
+vlan 130
+ name HR_NK
+vlan 140
+ name Administratie_NK
+vlan 150
+ name Wifi_NK
+vlan 160
+ name IT_NK
+vlan 170
+ name Productie_NK
+vlan 180
+ name Logistiek_NK
+vlan 190
+ name Tech_Support_NK
+vlan 210
+ name Switch_Management
+vlan 220
+ name Native_VLAN
+
+! --- Management IP (SVI) ---
+interface Vlan210
+ ip address 192.168.210.5 255.255.255.0
+ no shutdown
+ip default-gateway 192.168.210.66
+
+! --- Poort Configuratie ---
+! Uplink naar Router
+interface GigabitEthernet0/1
+ description Uplink to R-NK
+ switchport mode trunk
+
+! Uplink naar SW-NK-K
+interface FastEthernet0/24
+ description Uplink to SW-NK-K
+ switchport mode trunk
+
+! Uplink naar SW-NK-M
+interface FastEthernet0/23
+ description Uplink to SW-NK-M
+ switchport mode trunk
+
+end
+write memory
+
+
+
+! --- Basis Configuratie --------- SW-NK-K -------------------------------
+hostname SW-NK-K
+line console 0
+ password cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+! --- VLAN Creatie ---
+vlan 100
+ name Calculatie_NK
+vlan 110
+ name Engineering_NK
+vlan 130
+ name HR_NK
+vlan 140
+ name Administratie_NK
+vlan 150
+ name Wifi_NK
+vlan 210
+ name Switch_Management
+vlan 220
+ name Native_VLAN
+
+! --- Management IP (SVI) ---
+interface Vlan210
+ ip address 192.168.210.6 255.255.255.0
+ no shutdown
+ip default-gateway 192.168.210.66
+
+! --- Poort Configuratie ---
+! Uplink naar SW-NK-Core
+interface FastEthernet0/24
+ description Uplink to SW-NK-Core
+ switchport mode trunk
+
+! --- Access Poorten per VLAN (3 poorten per VLAN) ---
+
+! VLAN 100 (Calculatie)
+interface range FastEthernet0/1 - 3
+ description Access port for Calculatie VLAN 100
+ switchport mode access
+ switchport access vlan 100
+
+! VLAN 110 (Engineering)
+interface range FastEthernet0/4 - 6
+ description Access port for Engineering VLAN 110
+ switchport mode access
+ switchport access vlan 110
+
+! VLAN 130 (HR NK)
+interface range FastEthernet0/7 - 9
+ description Access port for HR NK VLAN 130
+ switchport mode access
+ switchport access vlan 130
+
+! VLAN 140 (Administratie NK)
+interface range FastEthernet0/10 - 12
+ description Access port for Administratie NK VLAN 140
+ switchport mode access
+ switchport access vlan 140
+
+! VLAN 150 (Wifi NK - voor AP's)
+interface range FastEthernet0/13 - 15
+ description Access port for Wifi AP VLAN 150
+ switchport mode access
+ switchport access vlan 150
+
+end
+write memory
+
+
+
+! --- Basis Configuratie ----- SW-NK-M -----------------------------------------
+hostname SW-NK-M
+line console 0
+ password cisco
+ login
+line vty 0 15
+ password cisco
+ login
+
+! --- VLAN Creatie ---
+vlan 150
+ name Wifi_NK
+vlan 160
+ name IT_NK
+vlan 170
+ name Productie_NK
+vlan 180
+ name Logistiek_NK
+vlan 190
+ name Tech_Support_NK
+vlan 210
+ name Switch_Management
+vlan 220
+ name Native_VLAN
+
+! --- Management IP (SVI) ---
+interface Vlan210
+ ip address 192.168.210.7 255.255.255.0
+ no shutdown
+ip default-gateway 192.168.210.66
+
+! --- Poort Configuratie ---
+! Uplink naar SW-NK-Core
+interface FastEthernet0/24
+ description Uplink to SW-NK-Core
+ switchport mode trunk
+
+! --- Access Poorten per VLAN (3 poorten per VLAN) ---
+
+! VLAN 150 (Wifi NK - voor AP's)
+interface range FastEthernet0/1 - 3
+ description Access port for Wifi AP VLAN 150
+ switchport mode access
+ switchport access vlan 150
+
+! VLAN 160 (IT NK)
+interface range FastEthernet0/4 - 6
+ description Access port for IT NK VLAN 160
+ switchport mode access
+ switchport access vlan 160
+
+! VLAN 170 (Productie NK)
+interface range FastEthernet0/7 - 9
+ description Access port for Productie NK VLAN 170
+ switchport mode access
+ switchport access vlan 170
+
+! VLAN 180 (Logistiek NK)
+interface range FastEthernet0/10 - 12
+ description Access port for Logistiek NK VLAN 180
+ switchport mode access
+ switchport access vlan 180
+
+! VLAN 190 (Technische Support NK)
+interface range FastEthernet0/13 - 15
+ description Access port for Tech Support NK VLAN 190
+ switchport mode access
+ switchport access vlan 190
+
+end
+write memory

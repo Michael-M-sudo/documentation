@@ -1,0 +1,434 @@
+4 routers met HWIC-2T module plaatsen en verbinden met serieële DCE kabels
+8 switches, 2 per router en verbinden met copper straight-through kabels
+8 pc's, 2 per router op dezelfde switch A en verbinden met copper straight-through kabels
+8 servers, 2 per router op dezelfde switch B en verbinden met copper straight-through kabels
+8 netwerken en 4 point to point verbindingen
+
+netwerken bepalen:
+192.168.0.0/24 voor netwerk 0
+192.168.1.0/24 voor netwerk 1
+192.168.2.0/24 voor netwerk 2
+192.168.3.0/24 voor netwerk 3
+192.168.4.0/24 voor netwerk 4
+192.168.5.0/24 voor nerwerk 5
+192.168.6.0/24 voor netwerk 6
+192.168.7.0/24 voor netwerk 7
+
+192.168.8.0/30 voor R0 naar R1
+192.168.8.4/30 voor R1 naar R2
+192.168.8.8/30 voor R2 naar R3
+192.168.8.12/30 voor R3 naar R0
+
+instellingen:
+PC0  192.168.0.1/24 en DG 192.168.0.66/24
+PC1  192.168.0.2/24 en DG 192.168.0.66/24
+SW0 vlan 192.168.0.100/24 DG 192.168.0.66/24 
+Ser0 192.168.1.1/24 en DG 192.168.1.66/24
+Ser1 192.168.1.2/24 en DG 192.168.1.66/24
+SW1 vlan 192.168.1.100/24 DG 192.168.1.66/24
+PC2  192.168.2.1/24 en DG 192.168.2.66/24
+PC3  192.168.2.2/24 en DG 192.168.2.66/24
+SW2 vlan 192.168.2.100/24 DG 192.168.2.66/24
+Ser2 192.168.3.1/24 en DG 192.168.3.66/24
+Ser3 192.168.3.2/24 en DG 192.168.3.66/24
+SW3 vlan 192.168.3.100/24 DG 192.168.6.66/24
+PC4  192.168.4.1/24 en DG 192.168.4.66/24
+PC5  192.168.4.2/24 en DG 192.168.4.66/24
+SW4 vlan 192.168.4.100/24 DG 192.168.4.66/24
+Ser4 192.168.5.1/24 en DG 192.168.5.66/24
+Ser5 192.168.5.2/24 en DG 192.168.5.66/24
+SW5 vlan 192.168.5.100/24 DG 192.168.5.66/24
+PC6  192.168.6.1/24 en DG 192.168.6.66/24
+PC7  192.168.6.2/24 en DG 192.168.6.66/24
+SW6 vlan 192.168.6.100/24 DG 192.168.6.66/24
+Ser6 192.168.7.1/24 en DG 192.168.7.66/24
+Ser7 192.168.7.2/24 en DG 192.168.7.66/24
+SW7 vlan 192.168.7.100/24 DG 192.168.7.66/24
+
+R0 G0/0 192.168.0.66/24 en G0/1 192.168.1.66/24
+R1 G0/0 192.168.2.66/24 en G0/1 192.168.3.66/24
+R2 G0/0 192.168.4.66/24 en G0/1 192.168.5.66/24
+R3 G0/0 192.168.6.66/24 en G0/1 192.168.7.66/24
+
+R0 S0/0/0 192.168.8.1 en S0/0/1 192.168.8.14
+R1 S0/0/0 192.168.8.2 en S0/0/1 192.168.8.5
+R2 S0/0/0 192.168.8.10 en S0/0/1 192.168.8.13
+R3 S0/0/0 192.168.8.9 en S0/0/1 192.168.8.6
+
+
+commands: 
+Routers:
+
+hostname R0
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface g0/0
+ip address 192.168.0.66 255.255.255.0
+no shutdown
+exit
+interface g0/1
+ip address 192.168.1.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.8.1 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.8.14 255.255.255.252
+no shutdown
+exit
+ip route 192.168.2.0 255.255.255.0 S0/0/0
+ip route 192.168.2.0 255.255.255.0 192.168.8.2
+ip route 192.168.2.0 255.255.255.0 s0/0/1 3
+ip route 192.168.2.0 255.255.255.0 192.168.8.13 3
+ip route 192.168.3.0 255.255.255.0 S0/0/0
+ip route 192.168.3.0 255.255.255.0 192.168.8.2
+ip route 192.168.3.0 255.255.255.0 s0/0/1 3
+ip route 192.168.3.0 255.255.255.0 192.168.8.13 3
+ip route 192.168.4.0 255.255.255.0 S0/0/1
+ip route 192.168.4.0 255.255.255.0 192.168.8.13
+ip route 192.168.4.0 255.255.255.0 s0/0/0 3
+ip route 192.168.4.0 255.255.255.0 192.168.8.2 3
+ip route 192.168.5.0 255.255.255.0 S0/0/1
+ip route 192.168.5.0 255.255.255.0 192.168.8.13
+ip route 192.168.5.0 255.255.255.0 s0/0/0 3
+ip route 192.168.5.0 255.255.255.0 192.168.8.2 3
+ip route 192.168.6.0 255.255.255.0 S0/0/1
+ip route 192.168.6.0 255.255.255.0 192.168.8.13
+ip route 192.168.6.0 255.255.255.0 s0/0/0 3
+ip route 192.168.6.0 255.255.255.0 192.168.8.2 3
+ip route 192.168.7.0 255.255.255.0 S0/0/1
+ip route 192.168.7.0 255.255.255.0 192.168.8.13
+ip route 192.168.7.0 255.255.255.0 s0/0/0 3
+ip route 192.168.7.0 255.255.255.0 192.168.8.2 3
+do copy run start
+
+hostname R1
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface g0/0
+ip address 192.168.2.66 255.255.255.0
+no shutdown
+exit
+interface g0/1
+ip address 192.168.3.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.8.2 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.8.5 255.255.255.252
+no shutdown
+exit
+ip route 192.168.0.0 255.255.255.0 S0/0/0
+ip route 192.168.0.0 255.255.255.0 192.168.8.1
+ip route 192.168.0.0 255.255.255.0 s0/0/1 3
+ip route 192.168.0.0 255.255.255.0 192.168.8.6 3
+ip route 192.168.1.0 255.255.255.0 S0/0/0
+ip route 192.168.1.0 255.255.255.0 192.168.8.1
+ip route 192.168.1.0 255.255.255.0 s0/0/1 3
+ip route 192.168.1.0 255.255.255.0 192.168.8.6 3
+ip route 192.168.4.0 255.255.255.0 S0/0/1
+ip route 192.168.4.0 255.255.255.0 192.168.8.6
+ip route 192.168.4.0 255.255.255.0 s0/0/0 3
+ip route 192.168.4.0 255.255.255.0 192.168.8.1 3
+ip route 192.168.5.0 255.255.255.0 S0/0/1
+ip route 192.168.5.0 255.255.255.0 192.168.8.6
+ip route 192.168.5.0 255.255.255.0 s0/0/0 3
+ip route 192.168.5.0 255.255.255.0 192.168.8.1 3
+ip route 192.168.6.0 255.255.255.0 S0/0/1
+ip route 192.168.6.0 255.255.255.0 192.168.8.6
+ip route 192.168.6.0 255.255.255.0 s0/0/0 3
+ip route 192.168.6.0 255.255.255.0 192.168.8.1 3
+ip route 192.168.7.0 255.255.255.0 S0/0/1
+ip route 192.168.7.0 255.255.255.0 192.168.8.6
+ip route 192.168.7.0 255.255.255.0 s0/0/0 3
+ip route 192.168.7.0 255.255.255.0 192.168.8.1 3
+do copy run start
+
+hostname R2
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface g0/0
+ip address 192.168.4.66 255.255.255.0
+no shutdown
+exit
+interface g0/1
+ip address 192.168.5.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.8.10 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.8.13 255.255.255.252
+no shutdown
+exit
+ip route 192.168.0.0 255.255.255.0 S0/0/1
+ip route 192.168.0.0 255.255.255.0 192.168.8.14
+ip route 192.168.0.0 255.255.255.0 s0/0/0 3
+ip route 192.168.0.0 255.255.255.0 192.168.8.9 3
+ip route 192.168.1.0 255.255.255.0 S0/0/1
+ip route 192.168.1.0 255.255.255.0 192.168.8.14
+ip route 192.168.1.0 255.255.255.0 s0/0/0 3
+ip route 192.168.1.0 255.255.255.0 192.168.8.9 3
+ip route 192.168.2.0 255.255.255.0 S0/0/1
+ip route 192.168.2.0 255.255.255.0 192.168.8.14
+ip route 192.168.2.0 255.255.255.0 s0/0/0 3
+ip route 192.168.2.0 255.255.255.0 192.168.8.9 3
+ip route 192.168.3.0 255.255.255.0 S0/0/1
+ip route 192.168.3.0 255.255.255.0 192.168.8.14
+ip route 192.168.3.0 255.255.255.0 s0/0/0 3
+ip route 192.168.3.0 255.255.255.0 192.168.8.9 3
+ip route 192.168.6.0 255.255.255.0 S0/0/0
+ip route 192.168.6.0 255.255.255.0 192.168.8.9
+ip route 192.168.6.0 255.255.255.0 s0/0/1 3
+ip route 192.168.6.0 255.255.255.0 192.168.8.14 3
+ip route 192.168.7.0 255.255.255.0 S0/0/0
+ip route 192.168.7.0 255.255.255.0 192.168.8.9
+ip route 192.168.7.0 255.255.255.0 s0/0/1 3
+ip route 192.168.7.0 255.255.255.0 192.168.8.14 3
+do copy run start
+
+hostname R3
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface g0/0
+ip address 192.168.6.66 255.255.255.0
+no shutdown
+exit
+interface g0/1
+ip address 192.168.7.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.8.9 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.8.6 255.255.255.252
+no shutdown
+exit
+ip route 192.168.0.0 255.255.255.0 S0/0/1
+ip route 192.168.0.0 255.255.255.0 192.168.8.5
+ip route 192.168.0.0 255.255.255.0 s0/0/0 3
+ip route 192.168.0.0 255.255.255.0 192.168.8.10 3
+ip route 192.168.1.0 255.255.255.0 S0/0/1
+ip route 192.168.1.0 255.255.255.0 192.168.8.5
+ip route 192.168.1.0 255.255.255.0 s0/0/0 3
+ip route 192.168.1.0 255.255.255.0 192.168.8.10 3
+ip route 192.168.2.0 255.255.255.0 S0/0/1
+ip route 192.168.2.0 255.255.255.0 192.168.8.5
+ip route 192.168.2.0 255.255.255.0 s0/0/0 3
+ip route 192.168.2.0 255.255.255.0 192.168.8.10 3
+ip route 192.168.3.0 255.255.255.0 S0/0/1
+ip route 192.168.3.0 255.255.255.0 192.168.8.5
+ip route 192.168.3.0 255.255.255.0 s0/0/0 3
+ip route 192.168.3.0 255.255.255.0 192.168.8.10 3
+ip route 192.168.4.0 255.255.255.0 S0/0/0
+ip route 192.168.4.0 255.255.255.0 192.168.8.10
+ip route 192.168.4.0 255.255.255.0 s0/0/1 3
+ip route 192.168.4.0 255.255.255.0 192.168.8.5 3
+ip route 192.168.5.0 255.255.255.0 S0/0/0
+ip route 192.168.5.0 255.255.255.0 192.168.8.10
+ip route 192.168.5.0 255.255.255.0 s0/0/1 3
+ip route 192.168.5.0 255.255.255.0 192.168.8.5 3
+do copy run start
+
+
+Switches:
+
+Switch 0:
+hostname SW0
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.0.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.0.66
+do copy run start
+
+Switch 1:
+hostname SW1
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.1.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.1.66
+do copy run start
+
+Switch2:
+hostname SW2
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.2.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.2.66
+do copy run start
+
+hostname SW3
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.3.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.3.66
+do copy run start
+
+hostname SW4
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.4.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.4.66
+do copy run start
+
+hostname SW5
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.5.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.5.66
+do copy run start
+
+hostname SW6
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.6.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.6.66
+do copy run start
+
+hostname SW7
+enable secret cisco
+line console 0
+password cisco
+login
+exit
+line vty 0 15
+password cisco
+login
+exit
+service password-encryption
+banner motd %Cisco is the greatest password%
+interface vlan 1
+ip address 192.168.7.100 255.255.255.0
+no shutdown
+exit
+ip default-gateway 192.168.7.66
+do copy run start

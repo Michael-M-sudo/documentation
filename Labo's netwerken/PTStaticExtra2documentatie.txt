@@ -1,0 +1,175 @@
+4 routers met HWIC-2T module plaatsen en verbinden met serieële DCE kabels
+4 pc's aansluiten, 1 per router en verbinden met copper straight-through kabels
+
+Netwerken bepalen: 
+192.168.0.0/24 voor netwerk 0 R0
+192.168.1.0/24 voor netwerk 1 R1
+192.168.2.0/24 voor netwerk 2 R2
+192.168.3.0/24 voor netwerk 3 R3
+
+Point to point verbindingen bepalen:
+tussen R0 en R1 192.168.4.0/30 van s0/0/0 naar s0/0/0
+tussen R0 en R2 192.168.4.4/30 van s0/0/1 naar s0/0/1
+tussen R1 en R3 192.168.4.8/30 van s0/0/1 naar s0/0/1
+tussen R2 en R3 192.168.4.12/30 van s0/0/0 naar s0/0/0
+
+PC0 192.168.0.1/24 R0 192.168.0.66/24 G0/0
+PC1 192.168.1.1/24 R1 192.168.1.66/24 G0/0
+PC2 192.168.2.1/24 R2 192.168.2.66/24 G0/0
+PC3 192.168.3.1/24 R3 192.168.3.66/24 G0/0
+
+R0 serieële poorten: 
+s0/0/0 192.168.4.1/30
+s0/0/1 192.168.4.5/30
+
+R1:
+s0/0/0 192.168.4.2/30
+s0/0/1 192.168.4.9/30
+
+R2:
+s0/0/0 192.168.4.13/30
+s0/0/1 192.168.4.6/30
+
+R3:
+s0/0/0 192.168.4.14/30
+s0/0/1 192.168.4.10/30
+
+Pc's instellen:
+IP instellen en default gateway
+PC0: 192.168.0.1/24 met DG 192.168.0.66/24
+PC1: 192.168.1.1/24 met DG 192.168.1.66/24
+PC2: 192.168.2.1/24 met DG 192.168.2.66/24
+PC3: 192.168.3.1/24 met DG 192.168.3.66/24
+
+Routers instellen:
+R0:
+hostname R0
+interface g0/0
+ip address 192.168.0.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.4.1 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.4.5 255.255.255.252
+no shutdown
+exit
+
+ip route 192.168.1.0 255.255.255.0 192.168.4.2
+ip route 192.168.1.0 255.255.255.0 s0/0/0
+ip route 192.168.1.0 255.255.255.0 192.168.4.6 3
+ip route 192.168.1.0 255.255.255.0 s0/0/1 3
+
+ip route 192.168.2.0 255.255.255.0 192.168.4.6
+ip route 192.168.2.0 255.255.255.0 s0/0/1
+ip route 192.168.2.0 255.255.255.0 192.168.4.2 3
+ip route 192.168.2.0 255.255.255.0 s0/0/0 3
+
+ip route 192.168.3.0 255.255.255.0 192.168.4.2
+ip route 192.168.3.0 255.255.255.0 s0/0/0
+ip route 192.168.3.0 255.255.255.0 192.168.4.6 3
+ip route 192.168.3.0 255.255.255.0 s0/0/1 3
+do copy run start
+
+
+R1:
+hostname R1
+Interface g0/0
+ip address 192.168.1.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.4.2 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.4.9 255.255.255.252
+no shutdown
+exit
+
+ip route 192.168.0.0 255.255.255.0 192.168.4.1
+ip route 192.168.0.0 255.255.255.0 s0/0/0
+ip route 192.168.0.0 255.255.255.0 192.168.4.10 3
+ip route 192.168.0.0 255.255.255.0 s0/0/1 3
+
+ip route 192.168.2.0 255.255.255.0 192.168.4.10
+ip route 192.168.2.0 255.255.255.0 s0/0/1
+ip route 192.168.2.0 255.255.255.0 192.168.4.1 3
+ip route 192.168.2.0 255.255.255.0 s0/0/0 3
+
+ip route 192.168.3.0 255.255.255.0 192.168.4.10
+ip route 192.168.3.0 255.255.255.0 s0/0/1
+ip route 192.168.3.0 255.255.255.0 192.168.4.1 3
+ip route 192.168.3.0 255.255.255.0 s0/0/0 3
+do copy run start
+
+
+R2:
+hostname R2
+interface g0/0
+ip address 192.168.2.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.4.13 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.4.6 255.255.255.252
+no shutdown
+exit
+
+ip route 192.168.0.0 255.255.255.0 192.168.4.5
+ip route 192.168.0.0 255.255.255.0 s0/0/1
+ip route 192.168.0.0 255.255.255.0 192.168.4.14 3
+ip route 192.168.0.0 255.255.255.0 s0/0/0 3
+
+ip route 192.168.1.0 255.255.255.0 192.168.4.5
+ip route 192.168.1.0 255.255.255.0 s0/0/1
+ip route 192.168.1.0 255.255.255.0 192.168.4.14 3
+ip route 192.168.1.0 255.255.255.0 s0/0/0 3
+
+ip route 192.168.3.0 255.255.255.0 192.168.4.14
+ip route 192.168.3.0 255.255.255.0 s0/0/0
+ip route 192.168.3.0 255.255.255.0 192.168.4.5 3
+ip route 192.168.3.0 255.255.255.0 s0/0/1 3
+do copy run start
+
+
+R3:
+hostname R3
+interface g0/0
+ip address 192.168.3.66 255.255.255.0
+no shutdown
+exit
+interface s0/0/0
+ip address 192.168.4.14 255.255.255.252
+no shutdown
+exit
+interface s0/0/1
+ip address 192.168.4.10 255.255.255.252
+no shutdown
+exit
+
+ip route 192.168.0.0 255.255.255.0 192.168.4.13
+ip route 192.168.0.0 255.255.255.0 s0/0/0
+ip route 192.168.0.0 255.255.255.0 192.168.4.9 3
+ip route 192.168.0.0 255.255.255.0 s0/0/1 3
+
+ip route 192.168.1.0 255.255.255.0 192.168.4.9
+ip route 192.168.1.0 255.255.255.0 s0/0/1
+ip route 192.168.1.0 255.255.255.0 192.168.4.13 3
+ip route 192.168.1.0 255.255.255.0 s0/0/0 3
+
+ip route 192.168.2.0 255.255.255 192.168.4.13
+ip route 192.168.2.0 255.255.255 s0/0/0
+ip route 192.168.0.0 255.255.255.0 192.168.4.9 3
+ip route 192.168.0.0 255.255.255.0 s0/0/1 3
+do copy run start
+
+
+Mijn volledige netwerk kan met elkaar communiceren.
+ik heb floating static routes dus als 1 router uitvalt dan valt enkel dat subnet uit, de andere kunnen blijven communiceren via alernatieve routes
+
